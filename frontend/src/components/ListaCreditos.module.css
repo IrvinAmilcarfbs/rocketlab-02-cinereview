@@ -1,0 +1,44 @@
+.bloco {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+}
+
+.titulo {
+  color: var(--cor-texto-fraco);
+  font-size: var(--txt-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nome {
+  padding: var(--esp-1) var(--esp-3);
+  color: var(--cor-texto);
+  font-size: var(--txt-sm);
+  background-color: var(--cor-superficie-alta);
+  border-radius: var(--raio);
+}
+
+.alternar {
+  align-self: flex-start;
+  padding: 0;
+  color: var(--cor-destaque);
+  font-size: var(--txt-xs);
+  font-weight: 600;
+  background: none;
+  border: none;
+}
+
+.alternar:hover {
+  text-decoration: underline;
+}

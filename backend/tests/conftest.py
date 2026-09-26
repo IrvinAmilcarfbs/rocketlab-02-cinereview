@@ -57,11 +57,16 @@ async def criar_filme(
     titulo: str,
     popularidade: float | None,
     generos: tuple[str, ...] = (),
+    pessoas: tuple[tuple[str, str], ...] = (),
+    produtoras: tuple[str, ...] = (),
     nota_media: float | None = None,
     qtd_avaliacoes: int = 0,
     com_fato: bool = True,
 ) -> models.DimMovie:
     """Cria um filme com suas relações, refletindo o que a carga produz.
+
+    ``pessoas`` recebe pares ``(nome, tipo_pessoa)``, como na base real, onde o
+    papel mora na dimensão e não na bridge.
 
     ``com_fato=False`` simula o caso em que o fato não foi gravado, que o
     catálogo deliberadamente não exibe.
@@ -77,6 +82,19 @@ async def criar_filme(
         existente = await sessao.get(models.DimGenre, nome)
         filme.genres.append(existente or models.DimGenre(sk_genre_id=nome, nome_genero=nome))
 
+    for nome, tipo in pessoas:
+        chave = f"{nome}-{tipo}"
+        existente = await sessao.get(models.DimPerson, chave)
+        filme.people.append(
+            existente or models.DimPerson(sk_person_id=chave, nome_pessoa=nome, tipo_pessoa=tipo)
+        )
+
+    for nome in produtoras:
+        existente = await sessao.get(models.DimCompany, nome)
+        filme.companies.append(
+            existente or models.DimCompany(sk_company_id=nome, nome_produtora=nome)
+        )
+
     if com_fato:
         filme.performance = models.FactMoviePerformance(popularidade=popularidade)
     if qtd_avaliacoes:
@@ -87,3 +105,28 @@ async def criar_filme(
     sessao.add(filme)
     await sessao.commit()
     return filme
+
+
+async def criar_avaliacoes(
+    sessao: AsyncSession, filme: models.DimMovie, quantidade: int
+) -> list[models.MovieReview]:
+    """Cria avaliações para um filme, todas no mesmo instante.
+
+    Reproduz de propósito a condição da carga real, em que as 43.666 avaliações
+    importadas compartilham apenas dois valores de ``created_at`` — é o cenário
+    que exige desempate pela chave na ordenação.
+    """
+
+    avaliacoes = [
+        models.MovieReview(
+            sk_movie_review_id=f"{filme.sk_movie_id}-{indice}",
+            sk_movie_id=filme.sk_movie_id,
+            nome=f"Avaliador {indice}",
+            nota=float(indice % 11),
+            comentario=f"Comentário {indice}",
+        )
+        for indice in range(quantidade)
+    ]
+    sessao.add_all(avaliacoes)
+    await sessao.commit()
+    return avaliacoes

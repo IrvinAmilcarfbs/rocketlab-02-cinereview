@@ -1,7 +1,12 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 
 import { buscar } from './cliente'
-import type { FilmeResumo, Pagina } from './tipos'
+import type {
+  AvaliacaoResumo,
+  FilmeDetalhe,
+  FilmeResumo,
+  Pagina,
+} from './tipos'
 
 export const TAMANHO_PAGINA = 20
 
@@ -19,6 +24,33 @@ export function useCatalogo(pagina: number) {
     queryKey: ['catalogo', pagina],
     queryFn: () =>
       buscar<Pagina<FilmeResumo>>('/movies', { pagina, tamanho: TAMANHO_PAGINA }),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export const AVALIACOES_POR_PAGINA = 10
+
+/** Carrega a ficha completa de um filme. */
+export function useFilme(id: string) {
+  return useQuery({
+    queryKey: ['filme', id],
+    queryFn: () => buscar<FilmeDetalhe>(`/movies/${id}`),
+  })
+}
+
+/** Carrega uma página de avaliações do filme.
+ *
+ * Fica numa query separada da ficha justamente para que criar uma avaliação
+ * (Etapa 7) invalide apenas esta lista, sem recarregar o filme inteiro.
+ */
+export function useAvaliacoes(id: string, pagina: number) {
+  return useQuery({
+    queryKey: ['avaliacoes', id, pagina],
+    queryFn: () =>
+      buscar<Pagina<AvaliacaoResumo>>(`/movies/${id}/reviews`, {
+        pagina,
+        tamanho: AVALIACOES_POR_PAGINA,
+      }),
     placeholderData: keepPreviousData,
   })
 }

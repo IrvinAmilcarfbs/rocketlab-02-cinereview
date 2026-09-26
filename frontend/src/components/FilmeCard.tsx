@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 import type { FilmeResumo } from '../api/tipos'
 import { Estrelas } from './Estrelas'
 import estilos from './FilmeCard.module.css'
@@ -12,7 +14,7 @@ export function FilmeCard({ filme }: Props) {
   const generos = filme.generos.slice(0, MAX_GENEROS)
 
   return (
-    <article className={estilos.card}>
+    <Link to={`/filmes/${filme.id}`} className={estilos.card}>
       <div className={estilos.capa}>
         {filme.poster_url ? (
           <img
@@ -61,6 +63,6 @@ export function FilmeCard({ filme }: Props) {
           )}
         </div>
       </div>
-    </article>
+    </Link>
   )
 }

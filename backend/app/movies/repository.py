@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from app.movies.models import DimMovie, FactMoviePerformance
+from app.movies.models import DimMovie, FactMoviePerformance, MovieReview
 
 
 async def contar_filmes(sessao: AsyncSession) -> int:
@@ -72,6 +72,72 @@ async def listar_filmes(sessao: AsyncSession, offset: int, limite: int) -> Seque
         .order_by(
             FactMoviePerformance.popularidade.desc(),
             FactMoviePerformance.sk_movie_id.desc(),
+        )
+        .offset(offset)
+        .limit(limite)
+    )
+    return (await sessao.scalars(consulta)).all()
+
+
+async def obter_filme(sessao: AsyncSession, filme_id: str) -> DimMovie | None:
+    """Carrega um filme com tudo que a ficha completa precisa.
+
+    Todas as coleções usam ``selectinload``, e aqui o motivo é o oposto do que
+    vale na listagem. Sem LIMIT, o risco não é o corte cair no lugar errado, e
+    sim o produto cartesiano: carregar gêneros, pessoas e produtoras por JOIN na
+    mesma consulta faria o banco devolver todas as combinações entre elas. Um
+    filme com 3 gêneros, 150 pessoas e 2 produtoras renderia 900 linhas para
+    exibir um único registro.
+
+    ``performance`` e ``reviews_summary`` são escalares, então ``joinedload``
+    é adequado e evita consultas extras.
+    """
+
+    consulta = (
+        select(DimMovie)
+        .where(DimMovie.sk_movie_id == filme_id)
+        .options(
+            selectinload(DimMovie.genres),
+            selectinload(DimMovie.people),
+            selectinload(DimMovie.companies),
+            joinedload(DimMovie.performance),
+            joinedload(DimMovie.reviews_summary),
+        )
+    )
+    return await sessao.scalar(consulta)
+
+
+async def filme_existe(sessao: AsyncSession, filme_id: str) -> bool:
+    """Confirma a existência do filme sem carregar suas relações."""
+
+    consulta = select(DimMovie.sk_movie_id).where(DimMovie.sk_movie_id == filme_id)
+    return await sessao.scalar(consulta) is not None
+
+
+async def contar_avaliacoes(sessao: AsyncSession, filme_id: str) -> int:
+    consulta = (
+        select(func.count()).select_from(MovieReview).where(MovieReview.sk_movie_id == filme_id)
+    )
+    return await sessao.scalar(consulta) or 0
+
+
+async def listar_avaliacoes(
+    sessao: AsyncSession, filme_id: str, offset: int, limite: int
+) -> Sequence[MovieReview]:
+    """Lista uma página de avaliações, da mais recente para a mais antiga.
+
+    O desempate pela chave é ainda mais necessário aqui do que no catálogo: como
+    a carga inicial grava todas as linhas na mesma transação, as 43.666
+    avaliações importadas compartilham apenas dois valores de ``created_at``.
+    Ordenar só pela data deixaria a ordem praticamente indefinida.
+    """
+
+    consulta = (
+        select(MovieReview)
+        .where(MovieReview.sk_movie_id == filme_id)
+        .order_by(
+            MovieReview.created_at.desc(),
+            MovieReview.sk_movie_review_id.desc(),
         )
         .offset(offset)
         .limit(limite)

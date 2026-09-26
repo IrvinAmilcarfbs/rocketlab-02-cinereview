@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
 import { ErroApi } from './api/cliente'
 import { Catalogo } from './pages/Catalogo'
+import { FilmeDetalhe } from './pages/FilmeDetalhe'
 
 const clienteQuery = new QueryClient({
   defaultOptions: {
@@ -27,6 +28,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Catalogo />} />
+          <Route path="/filmes/:id" element={<FilmeDetalhe />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

@@ -12,3 +12,7 @@ htmlcov/
 *.db-wal
 *.db-journal
 *.sqlite3
+
+# Base completa de CSVs: não versionada (ver README)
+data/full/*
+!data/full/.gitkeep

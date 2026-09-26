@@ -1,0 +1,64 @@
+.base {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-2);
+  align-items: center;
+  justify-content: center;
+  padding: var(--esp-8) 0;
+}
+
+.lista {
+  display: flex;
+  gap: var(--esp-1);
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.controle,
+.numero,
+.atual {
+  min-width: 40px;
+  padding: var(--esp-2) var(--esp-3);
+  color: var(--cor-texto-suave);
+  font-size: var(--txt-sm);
+  font-variant-numeric: tabular-nums;
+  background-color: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  transition:
+    background-color var(--transicao),
+    color var(--transicao),
+    border-color var(--transicao);
+}
+
+.controle:hover:not(:disabled),
+.numero:hover {
+  color: var(--cor-texto);
+  border-color: var(--cor-borda-forte);
+}
+
+.controle:disabled {
+  opacity: 0.4;
+}
+
+.atual {
+  color: var(--cor-fundo);
+  font-weight: 600;
+  background-color: var(--cor-destaque);
+  border-color: var(--cor-destaque);
+}
+
+.reticencias {
+  padding: 0 var(--esp-1);
+  color: var(--cor-texto-fraco);
+}
+
+@media (width <= 640px) {
+  /* Em telas estreitas a régua numérica não cabe; os controles de avançar e
+     voltar bastam, e o rodapé continua indicando a posição atual. */
+  .lista {
+    display: none;
+  }
+}

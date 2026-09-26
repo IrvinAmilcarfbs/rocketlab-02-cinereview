@@ -1,0 +1,57 @@
+.pagina {
+  max-width: var(--largura-max);
+  margin: 0 auto;
+  padding: var(--esp-8) var(--esp-4);
+}
+
+.cabecalho {
+  margin-bottom: var(--esp-8);
+}
+
+.marca {
+  font-size: var(--txt-2xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.marcaDestaque {
+  color: var(--cor-destaque);
+}
+
+.subtitulo {
+  margin-top: var(--esp-1);
+  color: var(--cor-texto-suave);
+  font-size: var(--txt-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* `auto-fill` com largura mínima dá responsividade sem media queries: a grade
+   acomoda quantas colunas couberem na largura disponível. */
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--esp-4);
+  transition: opacity var(--transicao);
+}
+
+.gradeAtualizando {
+  composes: grade;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.rodape {
+  padding-bottom: var(--esp-8);
+  color: var(--cor-texto-fraco);
+  font-size: var(--txt-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+@media (width <= 480px) {
+  .grade,
+  .gradeAtualizando {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: var(--esp-3);
+  }
+}

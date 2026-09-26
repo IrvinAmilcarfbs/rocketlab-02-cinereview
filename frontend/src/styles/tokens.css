@@ -1,0 +1,57 @@
+/* Design system mínimo do catálogo.
+ *
+ * Tema escuro: pôsteres são o conteúdo principal da tela e se destacam muito
+ * melhor sobre fundo escuro — é a convergência de praticamente todo serviço de
+ * cinema, incluindo o Letterboxd citado no enunciado.
+ *
+ * Os espaçamentos seguem uma escala de 4px para que o ritmo vertical seja
+ * consistente sem depender de valores arbitrários.
+ */
+
+:root {
+  /* Superfícies, da mais profunda à mais elevada */
+  --cor-fundo: #14181c;
+  --cor-superficie: #1c2228;
+  --cor-superficie-alta: #2c3440;
+  --cor-borda: #2c3440;
+  --cor-borda-forte: #3d4654;
+
+  /* Texto */
+  --cor-texto: #e8eaed;
+  --cor-texto-suave: #99aabb;
+  --cor-texto-fraco: #6b7a8a;
+
+  /* Acentos */
+  --cor-destaque: #00c030;
+  --cor-estrela: #00e054;
+  --cor-erro: #ff5a5f;
+
+  /* Espaçamento (escala de 4px) */
+  --esp-1: 0.25rem;
+  --esp-2: 0.5rem;
+  --esp-3: 0.75rem;
+  --esp-4: 1rem;
+  --esp-6: 1.5rem;
+  --esp-8: 2rem;
+  --esp-12: 3rem;
+
+  /* Tipografia */
+  --fonte: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --txt-xs: 0.75rem;
+  --txt-sm: 0.875rem;
+  --txt-base: 1rem;
+  --txt-lg: 1.125rem;
+  --txt-xl: 1.5rem;
+  --txt-2xl: 2rem;
+
+  /* Formas e profundidade */
+  --raio: 6px;
+  --raio-lg: 10px;
+  --sombra: 0 2px 8px rgb(0 0 0 / 40%);
+  --sombra-alta: 0 8px 24px rgb(0 0 0 / 50%);
+  --transicao: 150ms ease;
+
+  /* Layout */
+  --largura-max: 1200px;
+}

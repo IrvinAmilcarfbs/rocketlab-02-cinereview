@@ -1,0 +1,108 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  transition:
+    transform var(--transicao),
+    border-color var(--transicao),
+    box-shadow var(--transicao);
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  border-color: var(--cor-borda-forte);
+  box-shadow: var(--sombra-alta);
+}
+
+.capa {
+  /* Proporção padrão de pôster de cinema. Fixá-la evita que a grade salte
+     conforme as imagens carregam. */
+  aspect-ratio: 2 / 3;
+  background-color: var(--cor-superficie-alta);
+}
+
+.imagem {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.semCapa {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: var(--esp-4);
+  color: var(--cor-texto-fraco);
+  font-size: var(--txt-sm);
+  font-weight: 600;
+  text-align: center;
+}
+
+.info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--esp-1);
+  padding: var(--esp-3);
+}
+
+.titulo {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: var(--txt-sm);
+  font-weight: 600;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.ano {
+  color: var(--cor-texto-fraco);
+  font-size: var(--txt-xs);
+}
+
+.generos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-1);
+  margin: var(--esp-1) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.generos li {
+  padding: 2px var(--esp-2);
+  color: var(--cor-texto-suave);
+  font-size: var(--txt-xs);
+  background-color: var(--cor-superficie-alta);
+  border-radius: var(--raio);
+}
+
+.avaliacao {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  /* Empurra a avaliação para a base, alinhando-a entre cards de alturas
+     diferentes. */
+  margin-top: auto;
+  padding-top: var(--esp-2);
+}
+
+.quantidade {
+  color: var(--cor-texto-suave);
+  font-size: var(--txt-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.separador {
+  margin: 0 var(--esp-1);
+  color: var(--cor-texto-fraco);
+}
+
+.semNota {
+  color: var(--cor-texto-fraco);
+  font-size: var(--txt-xs);
+  font-style: italic;
+}

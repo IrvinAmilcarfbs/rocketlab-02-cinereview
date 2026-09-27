@@ -123,3 +123,62 @@ async def test_busca_ordena_por_popularidade_e_pagina(
     ]
     ids_primeira = {item["id"] for item in primeira["items"]}
     assert not ids_primeira & {item["id"] for item in segunda["items"]}
+
+
+async def test_agrupamento_ignora_pontuacao(cliente: AsyncClient, sessao: AsyncSession) -> None:
+    """O TMDB guarda o mesmo filme sob grafias que só diferem na pontuação.
+
+    Na base real, "die hart" casa com 61 registros, e três deles são
+    "Die Hart 2: Die Harter", "Die Hart 2 : Die Harter" e
+    "Die Hart 2 - Die Harter" — um único filme, três entradas.
+    """
+
+    for titulo in ("Die Hart 2: Die Harter", "Die Hart 2 : Die Harter", "Die Hart 2 - Die Harter"):
+        await criar_filme(sessao, titulo=titulo, popularidade=1.0)
+
+    corpo = (await cliente.get(ROTA, params={"busca": "die hart"})).json()
+
+    assert corpo["total"] == 1
+    assert len(corpo["items"]) == 1
+
+
+async def test_agrupamento_nao_funde_titulos_realmente_diferentes(
+    cliente: AsyncClient, sessao: AsyncSession
+) -> None:
+    """Ignorar pontuação não pode virar semelhança: palavras a mais separam.
+
+    Documenta o limite aceito da heurística. "Die Hart: Die Harter" e
+    "Die Hart 2: Die Harter" descrevem o mesmo filme na base real, mas uni-los
+    exigiria comparação difusa, que fundiria sequências legítimas.
+    """
+
+    await criar_filme(sessao, titulo="Die Hart: Die Harter", popularidade=2.0)
+    await criar_filme(sessao, titulo="Die Hart 2: Die Harter", popularidade=1.0)
+
+    assert (await cliente.get(ROTA, params={"busca": "die hart"})).json()["total"] == 2
+
+
+async def test_agrupamento_elege_o_registro_mais_completo(
+    cliente: AsyncClient, sessao: AsyncSession
+) -> None:
+    """Entre irmãos, a completude vem antes da popularidade.
+
+    O TMDB costuma ter um registro preenchido e outros em branco para o mesmo
+    filme. Eleger só pela popularidade exibia cards sem sinopse tendo o mesmo
+    filme completo ao lado. "Sem descrição" é o texto que a base grava no lugar
+    de uma sinopse ausente, e por isso não conta como preenchida.
+    """
+
+    popular = await criar_filme(sessao, titulo="Duplo Registro", popularidade=99.0)
+    popular.duracao_minutos = 100
+    popular.sinopse = "Sem descrição"
+
+    completo = await criar_filme(sessao, titulo="Duplo Registro", popularidade=1.0)
+    completo.duracao_minutos = 100
+    completo.sinopse = "Uma sinopse de verdade."
+    await sessao.commit()
+
+    itens = (await cliente.get(ROTA, params={"busca": "duplo"})).json()["items"]
+
+    assert len(itens) == 1
+    assert itens[0]["id"] == completo.sk_movie_id

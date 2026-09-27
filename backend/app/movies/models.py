@@ -27,7 +27,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.texto import normalizar_busca
+from app.core.texto import chave_agrupamento, normalizar_busca
 from app.db.base import Base
 
 
@@ -105,6 +105,10 @@ class DimMovie(Base):
     # por "cancao" não encontraria "Canção". Permanece anulável porque a coluna
     # foi acrescentada a um schema já existente.
     titulo_busca: Mapped[str | None] = mapped_column(String(500), index=True, default=None)
+    # Título reduzido a letras e dígitos, usado apenas para agrupar os registros
+    # repetidos que o TMDB traz do mesmo filme. Não tem índice de propósito: só
+    # é lido no PARTITION BY, depois de o LIKE já ter reduzido o conjunto.
+    titulo_chave: Mapped[str | None] = mapped_column(String(500), default=None)
     data_lancamento: Mapped[date | None] = mapped_column(Date, default=None)
     ano_lancamento: Mapped[int | None] = mapped_column(Integer, index=True, default=None)
     duracao_minutos: Mapped[int | None] = mapped_column(Integer, default=None)
@@ -137,18 +141,20 @@ class DimMovie(Base):
 
 @event.listens_for(DimMovie, "before_insert")
 @event.listens_for(DimMovie, "before_update")
-def _preencher_titulo_busca(_mapper: object, _conexao: object, filme: DimMovie) -> None:
-    """Mantém ``titulo_busca`` em dia a cada gravação pelo ORM.
+def _preencher_colunas_derivadas(_mapper: object, _conexao: object, filme: DimMovie) -> None:
+    """Mantém as colunas derivadas do título em dia a cada gravação pelo ORM.
 
     Deixar o preenchimento a cargo de quem escreve seria frágil: bastaria um
     cadastro esquecer a coluna para o filme nascer invisível à busca. O evento
     fecha essa porta para qualquer caminho que passe pelo ORM.
 
     A carga em massa não passa por aqui, porque usa o Core por desempenho — ela
-    calcula a mesma coluna explicitamente, em ``scripts/load_data.py``.
+    calcula as mesmas colunas explicitamente, em ``scripts/load_data.py``.
     """
 
-    filme.titulo_busca = normalizar_busca(filme.titulo or "")
+    titulo = filme.titulo or ""
+    filme.titulo_busca = normalizar_busca(titulo)
+    filme.titulo_chave = chave_agrupamento(titulo)
 
 
 class DimGenre(Base):

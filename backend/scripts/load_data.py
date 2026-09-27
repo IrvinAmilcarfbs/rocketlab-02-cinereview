@@ -32,7 +32,7 @@ from sqlalchemy import Date, Float, Integer, Numeric, Table, create_engine, even
 from sqlalchemy.engine import Engine
 
 from app.core.config import get_settings
-from app.core.texto import normalizar_busca
+from app.core.texto import chave_agrupamento, normalizar_busca
 from app.db.base import Base
 from app.movies import models  # noqa: F401  (registra as tabelas em Base.metadata)
 
@@ -119,14 +119,23 @@ def conversores_da_tabela(tabela: Table) -> dict[str, Callable[[str], object]]:
 def derivar_colunas(nome_tabela: str, registro: dict[str, object]) -> None:
     """Preenche colunas que a aplicação mantém e que não existem no CSV.
 
-    ``titulo_busca`` guarda o título sem acentos, usado pela busca. Calcular na
+    ``titulo_busca`` guarda o título sem acentos, usado pela busca, e
+    ``titulo_chave`` a forma sem pontuação que agrupa os repetidos. Calcular na
     montagem do lote evita percorrer as 95 mil linhas de novo com UPDATEs
     depois da carga.
+
+    O ORM mantém as mesmas colunas por evento (ver ``app.movies.models``); a
+    carga em massa usa o Core e não dispara eventos, daí a repetição.
     """
 
     if nome_tabela == "dim_movies":
         titulo = registro.get("titulo")
-        registro["titulo_busca"] = normalizar_busca(titulo) if isinstance(titulo, str) else None
+        if isinstance(titulo, str):
+            registro["titulo_busca"] = normalizar_busca(titulo)
+            registro["titulo_chave"] = chave_agrupamento(titulo)
+        else:
+            registro["titulo_busca"] = None
+            registro["titulo_chave"] = None
 
 
 def ler_lotes(caminho: Path, tabela: Table, tamanho: int) -> Iterator[list[dict[str, object]]]:

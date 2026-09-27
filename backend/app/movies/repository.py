@@ -168,10 +168,18 @@ def _escapar_like(termo: str) -> str:
 
 # A busca é escrita em SQL explícito por causa de uma única palavra: MATERIALIZED.
 #
-# O catálogo tem 12.165 linhas com título repetido — "Die Hart 2: Die Harter"
-# aparece 30 vezes, com identificadores distintos vindos do TMDB. Para não
+# O catálogo tem 12.165 linhas com título repetido — "die hart" casa com 61
+# registros, todos com id_filme distinto vindo do TMDB, porque a base de origem
+# guarda entradas duplicadas do mesmo filme que ninguém mesclou. Para não
 # devolver dezenas de cards idênticos, ROW_NUMBER numera as linhas dentro de
-# cada grupo de título, ano e duração, e a busca fica com a primeira de cada.
+# cada grupo e a busca fica com a primeira de cada.
+#
+# O grupo é (titulo_chave, ano, duração). A chave ignora pontuação porque as
+# grafias divergem justamente nela ("Die Hart 2: Die Harter" e "Die Hart 2 :
+# Die Harter"): isso funde 181 grupos no catálogo, e "die hart" cai de 12 para
+# 10 resultados. A duração fica na chave de propósito — sem ela seriam 5
+# resultados, mas 752 grupos do catálogo passariam a fundir durações reais
+# diferentes, juntando o curta e o longa que compartilham título e ano.
 #
 # Sem MATERIALIZED, o SQLite embute a subconsulta no plano externo e decide
 # percorrer o índice de popularidade do fato inteiro — 95 mil linhas — antes de
@@ -180,14 +188,23 @@ def _escapar_like(termo: str) -> str:
 #
 # `HasCTE.cte()` não expõe essa dica, e as alternativas medidas foram piores:
 # NOT EXISTS correlacionado custou 187–388 ms e agrupar em Python, ~520 ms.
+#
+# Dentro do grupo, o representante é o registro mais completo, e só depois o mais
+# popular: entre irmãos idênticos o TMDB costuma ter um preenchido e outros em
+# branco, e eleger pela popularidade sozinha exibia cards sem sinopse nem pôster
+# tendo o mesmo filme completo ao lado. "Sem descrição" é o texto que a base de
+# origem grava no lugar de uma sinopse ausente.
 _CANDIDATOS = """
     WITH candidatos AS MATERIALIZED (
         SELECT
             m.sk_movie_id AS sk_movie_id,
-            m.titulo AS titulo,
+            m.titulo_chave AS titulo_chave,
             m.ano_lancamento AS ano_lancamento,
             m.duracao_minutos AS duracao_minutos,
-            f.popularidade AS popularidade
+            f.popularidade AS popularidade,
+            (COALESCE(m.duracao_minutos, 0) > 0)
+                + (m.url_poster IS NOT NULL)
+                + (COALESCE(m.sinopse, '') NOT IN ('', 'Sem descrição')) AS completude
         FROM dim_movies AS m
         JOIN fact_movies_performance AS f ON f.sk_movie_id = m.sk_movie_id
         WHERE m.titulo_busca LIKE :padrao ESCAPE '!'
@@ -197,8 +214,8 @@ _CANDIDATOS = """
             sk_movie_id,
             popularidade,
             ROW_NUMBER() OVER (
-                PARTITION BY titulo, ano_lancamento, duracao_minutos
-                ORDER BY popularidade DESC, sk_movie_id DESC
+                PARTITION BY titulo_chave, ano_lancamento, duracao_minutos
+                ORDER BY completude DESC, popularidade DESC, sk_movie_id DESC
             ) AS posicao
         FROM candidatos
     )

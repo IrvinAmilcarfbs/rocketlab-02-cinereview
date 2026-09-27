@@ -5,6 +5,9 @@
 }
 
 .cabecalho {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-4);
   margin-bottom: var(--esp-8);
 }
 

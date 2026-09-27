@@ -6,6 +6,7 @@ cada conexão do pool enxergaria um banco vazio e diferente.
 """
 
 from collections.abc import AsyncIterator
+from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -73,7 +74,9 @@ async def criar_filme(
     """
 
     filme = models.DimMovie(
-        id_filme=f"id-{titulo}",
+        # Título não serve como identificador: os testes de agrupamento criam
+        # vários filmes homônimos de propósito, e `id_filme` é único.
+        id_filme=uuid4().hex,
         titulo=titulo,
         ano_lancamento=2024,
         url_poster=f"https://exemplo/{titulo}.jpg",

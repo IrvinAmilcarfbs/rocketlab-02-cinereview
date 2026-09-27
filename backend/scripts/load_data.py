@@ -32,6 +32,7 @@ from sqlalchemy import Date, Float, Integer, Numeric, Table, create_engine, even
 from sqlalchemy.engine import Engine
 
 from app.core.config import get_settings
+from app.core.texto import normalizar_busca
 from app.db.base import Base
 from app.movies import models  # noqa: F401  (registra as tabelas em Base.metadata)
 
@@ -115,6 +116,19 @@ def conversores_da_tabela(tabela: Table) -> dict[str, Callable[[str], object]]:
     return mapa
 
 
+def derivar_colunas(nome_tabela: str, registro: dict[str, object]) -> None:
+    """Preenche colunas que a aplicação mantém e que não existem no CSV.
+
+    ``titulo_busca`` guarda o título sem acentos, usado pela busca. Calcular na
+    montagem do lote evita percorrer as 95 mil linhas de novo com UPDATEs
+    depois da carga.
+    """
+
+    if nome_tabela == "dim_movies":
+        titulo = registro.get("titulo")
+        registro["titulo_busca"] = normalizar_busca(titulo) if isinstance(titulo, str) else None
+
+
 def ler_lotes(caminho: Path, tabela: Table, tamanho: int) -> Iterator[list[dict[str, object]]]:
     """Percorre o CSV em lotes, convertendo cada campo para o tipo da coluna."""
 
@@ -132,13 +146,13 @@ def ler_lotes(caminho: Path, tabela: Table, tamanho: int) -> Iterator[list[dict[
 
         lote: list[dict[str, object]] = []
         for linha in leitor:
-            lote.append(
-                {
-                    nome: conversores[nome](valor or "")
-                    for nome, valor in linha.items()
-                    if nome in colunas
-                }
-            )
+            registro = {
+                nome: conversores[nome](valor or "")
+                for nome, valor in linha.items()
+                if nome in colunas
+            }
+            derivar_colunas(tabela.name, registro)
+            lote.append(registro)
             if len(lote) >= tamanho:
                 yield lote
                 lote = []

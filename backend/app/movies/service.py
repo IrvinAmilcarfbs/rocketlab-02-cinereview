@@ -9,6 +9,7 @@ mudança no contrato exija mexer nas consultas.
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import Pagina, ParametrosPaginacao
+from app.core.texto import normalizar_busca
 from app.movies import repository
 from app.movies.models import DimMovie, MovieReview
 from app.movies.schemas import (
@@ -42,12 +43,28 @@ def para_resumo(filme: DimMovie) -> FilmeResumo:
 
 
 async def listar_catalogo(
-    sessao: AsyncSession, parametros: ParametrosPaginacao
+    sessao: AsyncSession,
+    parametros: ParametrosPaginacao,
+    busca: str | None = None,
 ) -> Pagina[FilmeResumo]:
-    """Monta uma página do catálogo."""
+    """Monta uma página do catálogo, filtrada por título quando houver busca.
 
-    total = await repository.contar_filmes(sessao)
-    filmes = await repository.listar_filmes(sessao, parametros.offset, parametros.tamanho)
+    O termo digitado passa pela mesma normalização aplicada a ``titulo_busca``
+    na carga — é o que permite "cancao" encontrar "Canção". Um termo que sobra
+    vazio depois disso (só espaços, por exemplo) equivale a não buscar.
+    """
+
+    termo = normalizar_busca(busca) if busca else ""
+
+    if termo:
+        total = await repository.contar_busca(sessao, termo)
+        filmes = await repository.buscar_filmes(
+            sessao, termo, parametros.offset, parametros.tamanho
+        )
+    else:
+        total = await repository.contar_filmes(sessao)
+        filmes = await repository.listar_filmes(sessao, parametros.offset, parametros.tamanho)
+
     return Pagina.montar([para_resumo(filme) for filme in filmes], total, parametros)
 
 

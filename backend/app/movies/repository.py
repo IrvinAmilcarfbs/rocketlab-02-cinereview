@@ -6,7 +6,7 @@ para o contrato da API é responsabilidade do serviço.
 
 from collections.abc import Sequence
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -143,3 +143,114 @@ async def listar_avaliacoes(
         .limit(limite)
     )
     return (await sessao.scalars(consulta)).all()
+
+
+ESCAPE_LIKE = "!"
+
+
+def _escapar_like(termo: str) -> str:
+    """Neutraliza os curingas do LIKE dentro do texto digitado.
+
+    Sem isto, buscar por "100%" faria o ``%`` valer como curinga e casar com
+    praticamente tudo; ``_`` casaria com qualquer caractere.
+
+    O caractere de escape é ``!`` em vez da barra invertida habitual: a barra
+    precisaria ser escapada na string Python e de novo no literal SQL, o que
+    torna fácil escrever algo que o banco recebe errado.
+    """
+
+    return (
+        termo.replace(ESCAPE_LIKE, ESCAPE_LIKE * 2)
+        .replace("%", f"{ESCAPE_LIKE}%")
+        .replace("_", f"{ESCAPE_LIKE}_")
+    )
+
+
+# A busca é escrita em SQL explícito por causa de uma única palavra: MATERIALIZED.
+#
+# O catálogo tem 12.165 linhas com título repetido — "Die Hart 2: Die Harter"
+# aparece 30 vezes, com identificadores distintos vindos do TMDB. Para não
+# devolver dezenas de cards idênticos, ROW_NUMBER numera as linhas dentro de
+# cada grupo de título, ano e duração, e a busca fica com a primeira de cada.
+#
+# Sem MATERIALIZED, o SQLite embute a subconsulta no plano externo e decide
+# percorrer o índice de popularidade do fato inteiro — 95 mil linhas — antes de
+# aplicar o filtro. Medido: 531 ms contra 41 ms. A palavra-chave o obriga a
+# calcular os candidatos primeiro, que é o conjunto pequeno.
+#
+# `HasCTE.cte()` não expõe essa dica, e as alternativas medidas foram piores:
+# NOT EXISTS correlacionado custou 187–388 ms e agrupar em Python, ~520 ms.
+_CANDIDATOS = """
+    WITH candidatos AS MATERIALIZED (
+        SELECT
+            m.sk_movie_id AS sk_movie_id,
+            m.titulo AS titulo,
+            m.ano_lancamento AS ano_lancamento,
+            m.duracao_minutos AS duracao_minutos,
+            f.popularidade AS popularidade
+        FROM dim_movies AS m
+        JOIN fact_movies_performance AS f ON f.sk_movie_id = m.sk_movie_id
+        WHERE m.titulo_busca LIKE :padrao ESCAPE '!'
+    ),
+    representantes AS (
+        SELECT
+            sk_movie_id,
+            popularidade,
+            ROW_NUMBER() OVER (
+                PARTITION BY titulo, ano_lancamento, duracao_minutos
+                ORDER BY popularidade DESC, sk_movie_id DESC
+            ) AS posicao
+        FROM candidatos
+    )
+"""
+
+CONTAR_BUSCA = text(_CANDIDATOS + "SELECT COUNT(*) FROM representantes WHERE posicao = 1")
+
+BUSCAR_IDS = text(
+    _CANDIDATOS
+    + """
+    SELECT sk_movie_id FROM representantes
+    WHERE posicao = 1
+    ORDER BY popularidade DESC, sk_movie_id DESC
+    LIMIT :limite OFFSET :offset
+    """
+)
+
+
+async def contar_busca(sessao: AsyncSession, termo: str) -> int:
+    """Conta os grupos encontrados, e não as linhas — o mesmo que a busca exibe."""
+
+    padrao = f"%{_escapar_like(termo)}%"
+    return await sessao.scalar(CONTAR_BUSCA, {"padrao": padrao}) or 0
+
+
+async def buscar_filmes(
+    sessao: AsyncSession, termo: str, offset: int, limite: int
+) -> Sequence[DimMovie]:
+    """Busca por título, sem títulos repetidos, ordenada por popularidade.
+
+    A consulta em SQL devolve apenas as chaves; as entidades são carregadas em
+    seguida pelo ORM, o que mantém o mesmo carregamento de relações usado no
+    catálogo. A ordem vinda do SQL é restaurada ao final, porque um `IN` não
+    garante ordem alguma.
+    """
+
+    ids = (
+        await sessao.scalars(
+            BUSCAR_IDS,
+            {"padrao": f"%{_escapar_like(termo)}%", "limite": limite, "offset": offset},
+        )
+    ).all()
+    if not ids:
+        return []
+
+    consulta = (
+        select(DimMovie)
+        .where(DimMovie.sk_movie_id.in_(ids))
+        .options(
+            selectinload(DimMovie.genres),
+            joinedload(DimMovie.reviews_summary),
+        )
+    )
+    encontrados = {filme.sk_movie_id: filme for filme in (await sessao.scalars(consulta)).all()}
+    return [encontrados[chave] for chave in ids if chave in encontrados]

@@ -19,11 +19,19 @@ export const TAMANHO_PAGINA = 20
  * A `queryKey` inclui a página: é ela que identifica a entrada no cache, e é
  * por isso que voltar para uma página já visitada é instantâneo.
  */
-export function useCatalogo(pagina: number) {
+export function useCatalogo(pagina: number, busca = '') {
+  const termo = busca.trim()
   return useQuery({
-    queryKey: ['catalogo', pagina],
+    // O termo faz parte da chave: cada busca vira uma entrada de cache propria,
+    // entao respostas que chegam fora de ordem nao se sobrescrevem e repetir
+    // uma busca ja feita e instantaneo.
+    queryKey: ['catalogo', pagina, termo],
     queryFn: () =>
-      buscar<Pagina<FilmeResumo>>('/movies', { pagina, tamanho: TAMANHO_PAGINA }),
+      buscar<Pagina<FilmeResumo>>('/movies', {
+        pagina,
+        tamanho: TAMANHO_PAGINA,
+        busca: termo || undefined,
+      }),
     placeholderData: keepPreviousData,
   })
 }

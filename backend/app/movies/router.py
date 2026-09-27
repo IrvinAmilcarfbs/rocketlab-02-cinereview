@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import Pagina, ParametrosPaginacao
@@ -24,10 +24,21 @@ Sessao = Annotated[AsyncSession, Depends(get_db)]
 async def listar_filmes(
     parametros: Annotated[ParametrosPaginacao, Depends()],
     sessao: Sessao,
+    busca: Annotated[
+        str | None,
+        Query(
+            max_length=200,
+            description="Filtra por título; ignora acentos e diferenças de caixa.",
+        ),
+    ] = None,
 ) -> Pagina[FilmeResumo]:
-    """Devolve uma página do catálogo, ordenada por popularidade decrescente."""
+    """Devolve uma página do catálogo, ordenada por popularidade decrescente.
 
-    return await service.listar_catalogo(sessao, parametros)
+    Com ``busca`` preenchida, títulos repetidos são agrupados e apenas a entrada
+    mais popular de cada grupo aparece.
+    """
+
+    return await service.listar_catalogo(sessao, parametros, busca)
 
 
 @router.get(

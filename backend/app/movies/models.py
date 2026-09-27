@@ -22,10 +22,12 @@ from sqlalchemy import (
     String,
     Table,
     UniqueConstraint,
+    event,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.texto import normalizar_busca
 from app.db.base import Base
 
 
@@ -98,6 +100,11 @@ class DimMovie(Base):
     )
     id_filme: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     titulo: Mapped[str] = mapped_column(String(500), index=True)
+    # Título sem acentos e em caixa baixa, usado apenas pela busca. É mantido
+    # pela aplicação (ver app.core.texto.normalizar_busca): sem ele, procurar
+    # por "cancao" não encontraria "Canção". Permanece anulável porque a coluna
+    # foi acrescentada a um schema já existente.
+    titulo_busca: Mapped[str | None] = mapped_column(String(500), index=True, default=None)
     data_lancamento: Mapped[date | None] = mapped_column(Date, default=None)
     ano_lancamento: Mapped[int | None] = mapped_column(Integer, index=True, default=None)
     duracao_minutos: Mapped[int | None] = mapped_column(Integer, default=None)
@@ -126,6 +133,22 @@ class DimMovie(Base):
     reviews: Mapped[list["MovieReview"]] = relationship(
         back_populates="movie", cascade="all, delete-orphan", order_by="MovieReview.created_at"
     )
+
+
+@event.listens_for(DimMovie, "before_insert")
+@event.listens_for(DimMovie, "before_update")
+def _preencher_titulo_busca(_mapper: object, _conexao: object, filme: DimMovie) -> None:
+    """Mantém ``titulo_busca`` em dia a cada gravação pelo ORM.
+
+    Deixar o preenchimento a cargo de quem escreve seria frágil: bastaria um
+    cadastro esquecer a coluna para o filme nascer invisível à busca. O evento
+    fecha essa porta para qualquer caminho que passe pelo ORM.
+
+    A carga em massa não passa por aqui, porque usa o Core por desempenho — ela
+    calcula a mesma coluna explicitamente, em ``scripts/load_data.py``.
+    """
+
+    filme.titulo_busca = normalizar_busca(filme.titulo or "")
 
 
 class DimGenre(Base):

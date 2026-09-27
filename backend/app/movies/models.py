@@ -4,7 +4,7 @@ O domínio foi organizado como esquema estrela para suportar consultas
 analíticas, mantendo relações de navegação úteis para a futura API.
 """
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from hashlib import sha256
 from typing import Literal
@@ -280,7 +280,21 @@ class MovieReview(Base):
     nome: Mapped[str] = mapped_column(String(120))
     nota: Mapped[float] = mapped_column(Double)
     comentario: Mapped[str] = mapped_column(String(4000))
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # Dois valores padrão, de propósito. O `server_default` mantém a coluna
+    # preenchida para qualquer escrita que a omita, inclusive em SQL bruto — mas
+    # `CURRENT_TIMESTAMP` no SQLite tem precisão de **segundo**, e duas
+    # avaliações no mesmo segundo ficariam sem ordem definida entre si; o
+    # desempate pela chave não ajuda, porque é um SHA-256 aleatório e não
+    # codifica recência. O `default` em Python traz microssegundos e torna
+    # "mais recente primeiro" verdadeiro de fato.
+    #
+    # O valor é UTC ingênuo, igual ao que `CURRENT_TIMESTAMP` grava, para que as
+    # linhas antigas e as novas signifiquem a mesma coisa. O fuso é anexado na
+    # serialização (ver `app.movies.service.para_avaliacao`).
+    created_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(),
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+    )
 
     movie: Mapped[DimMovie] = relationship(back_populates="reviews")
 

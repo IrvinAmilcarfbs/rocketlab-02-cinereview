@@ -1,0 +1,88 @@
+.campo {
+  display: flex;
+  gap: var(--esp-3);
+  align-items: center;
+}
+
+.estrelas {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+
+.trilha,
+.preenchida {
+  display: flex;
+  gap: 3px;
+}
+
+.preenchida {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.icone {
+  width: 28px;
+  height: 28px;
+  /* Sem isto os ícones encolheriam para caber na largura recortada,
+     em vez de serem cortados no meio. */
+  flex-shrink: 0;
+}
+
+.trilha .icone {
+  fill: var(--cor-borda-forte);
+}
+
+.preenchida .icone {
+  fill: var(--cor-estrela);
+}
+
+/* As dez áreas clicáveis cobrem o desenho: duas por estrela, meia largura cada. */
+.alvos {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.alvo {
+  flex: 1;
+  cursor: pointer;
+}
+
+/* O rádio é invisível mas continua focável, e o foco aparece na área inteira. */
+.radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.alvo:focus-within {
+  outline: 2px solid var(--cor-destaque);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.leitura {
+  color: var(--cor-texto);
+  font-size: var(--txt-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.leituraVazia {
+  composes: leitura;
+  color: var(--cor-texto-fraco);
+  font-weight: 400;
+}
+
+.apenasLeitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

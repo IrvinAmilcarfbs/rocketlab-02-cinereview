@@ -173,3 +173,24 @@ class AvaliacaoResumo(BaseModel):
     nota: float = Field(description="Nota na escala 0–10.")
     comentario: str
     criado_em: datetime
+
+
+class AvaliacaoEntrada(BaseModel):
+    """Avaliação enviada por um usuário.
+
+    ``nota`` aceita a escala inteira de 0 a 10 do banco, e não apenas os valores
+    que a interface produz. O formulário usa estrelas com meia estrela, que geram
+    inteiros de 1 a 10, mas as 43.666 avaliações carregadas têm valores como 1,27
+    e 7,33 — restringir o contrato ao que a tela digita tornaria parte dos dados
+    existentes impossível de reenviar.
+
+    O intervalo repete o ``CheckConstraint`` da tabela de propósito: a validação
+    no schema devolve 422 com o campo culpado, enquanto a do banco devolveria um
+    erro de integridade. As duas existem, e cada uma protege de um lado.
+    """
+
+    nome: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+    nota: float = Field(ge=0, le=10, description="Nota na escala 0–10.")
+    comentario: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
+    ]

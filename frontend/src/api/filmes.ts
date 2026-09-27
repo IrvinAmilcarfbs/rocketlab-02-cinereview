@@ -7,6 +7,7 @@ import {
 
 import { buscar, enviar } from './cliente'
 import type {
+  AvaliacaoEntrada,
   AvaliacaoResumo,
   FilmeDetalhe,
   FilmeEntrada,
@@ -130,5 +131,43 @@ export function useRemoverFilme() {
       cliente.removeQueries({ queryKey: ['avaliacoes', id] })
       void cliente.invalidateQueries({ queryKey: ['catalogo'] })
     },
+  })
+}
+
+/** Invalida tudo que uma avaliação muda.
+ *
+ * Três chaves, e cada uma por um motivo: a lista de avaliações ganhou ou perdeu
+ * um item; a ficha do filme mostra a média e a contagem; e o card no catálogo
+ * mostra a média também. Esquecer a terceira deixaria a nota antiga na grade até
+ * o cache expirar — o tipo de inconsistência que o usuário vê e não explica.
+ */
+function invalidarAposAvaliacao(cliente: ReturnType<typeof useQueryClient>, filmeId: string) {
+  void cliente.invalidateQueries({ queryKey: ['avaliacoes', filmeId] })
+  void cliente.invalidateQueries({ queryKey: ['filme', filmeId] })
+  void cliente.invalidateQueries({ queryKey: ['catalogo'] })
+}
+
+/** Publica uma avaliação. */
+export function useCriarAvaliacao(filmeId: string) {
+  const cliente = useQueryClient()
+  return useMutation({
+    mutationFn: (entrada: AvaliacaoEntrada) =>
+      enviar<AvaliacaoResumo>('POST', `/movies/${filmeId}/reviews`, entrada),
+    onSuccess: () => invalidarAposAvaliacao(cliente, filmeId),
+  })
+}
+
+/** Remove uma avaliação.
+ *
+ * Diferente da remoção de filme, aqui é `invalidateQueries` e não
+ * `removeQueries`: o que deixou de existir é um item dentro de uma lista que
+ * continua existindo, e essa lista precisa ser buscada de novo.
+ */
+export function useRemoverAvaliacao(filmeId: string) {
+  const cliente = useQueryClient()
+  return useMutation({
+    mutationFn: (avaliacaoId: string) =>
+      enviar<void>('DELETE', `/movies/${filmeId}/reviews/${avaliacaoId}`),
+    onSuccess: () => invalidarAposAvaliacao(cliente, filmeId),
   })
 }

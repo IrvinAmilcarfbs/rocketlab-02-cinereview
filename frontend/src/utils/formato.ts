@@ -45,3 +45,55 @@ export function formatarDinheiro(valor: number | null): string | null {
 export function formatarNumero(valor: number | null): string | null {
   return valor === null ? null : valor.toLocaleString('pt-BR')
 }
+
+const MINUTO = 60_000
+const HORA = 60 * MINUTO
+const DIA = 24 * HORA
+/** Fronteira entre "é notícia" e "é história". */
+const LIMITE_RELATIVO = 7 * DIA
+
+/** Formata um instante como tempo relativo na primeira semana, data depois.
+ *
+ * "há 3 horas" responde a pergunta que se faz de uma avaliação recente — quão
+ * recente? Passada uma semana, a pergunta muda: "há 43 dias" obriga o leitor a
+ * fazer a conta que ele queria pronta, e a data absoluta responde melhor.
+ *
+ * O instante chega com fuso (`...+00:00`), porque o backend o marca como UTC.
+ * Sem esse fuso, o JavaScript leria a data-hora como local e uma avaliação
+ * criada agora apareceria três horas no futuro.
+ */
+export function formatarQuando(iso: string | null): string | null {
+  if (!iso) {
+    return null
+  }
+
+  const instante = new Date(iso)
+  if (Number.isNaN(instante.getTime())) {
+    return null
+  }
+
+  const decorrido = Date.now() - instante.getTime()
+
+  // Relógios podem divergir por alguns segundos entre servidor e navegador; um
+  // instante "no futuro" por essa margem ainda é agora, não uma data futura.
+  if (decorrido < MINUTO) {
+    return 'agora mesmo'
+  }
+
+  if (decorrido < LIMITE_RELATIVO) {
+    const relativo = new Intl.RelativeTimeFormat('pt-BR', { numeric: 'auto' })
+    if (decorrido < HORA) {
+      return relativo.format(-Math.floor(decorrido / MINUTO), 'minute')
+    }
+    if (decorrido < DIA) {
+      return relativo.format(-Math.floor(decorrido / HORA), 'hour')
+    }
+    return relativo.format(-Math.floor(decorrido / DIA), 'day')
+  }
+
+  return instante.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })
+}

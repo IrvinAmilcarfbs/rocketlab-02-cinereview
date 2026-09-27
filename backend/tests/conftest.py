@@ -138,13 +138,19 @@ async def criar_generos(sessao: AsyncSession, *nomes: str) -> list[models.DimGen
 async def criar_avaliacoes(
     sessao: AsyncSession, filme: models.DimMovie, quantidade: int
 ) -> list[models.MovieReview]:
-    """Cria avaliações para um filme, todas no mesmo instante.
+    """Cria avaliações para um filme, todas no mesmo instante e no passado.
 
-    Reproduz de propósito a condição da carga real, em que as 43.666 avaliações
-    importadas compartilham apenas dois valores de ``created_at`` — é o cenário
-    que exige desempate pela chave na ordenação.
+    O instante compartilhado reproduz de propósito a condição da carga real, em
+    que as 43.666 avaliações importadas dividem apenas dois valores de
+    ``created_at`` — é o cenário que exige desempate pela chave na ordenação.
+
+    Ele é explícito, e não herdado do padrão da coluna, por duas razões: o padrão
+    agora traz microssegundos e não produziria o empate que se quer testar, e a
+    data no passado é o que permite verificar que uma avaliação enviada pela API
+    aparece antes destas.
     """
 
+    momento = datetime(2026, 1, 1, 12, 0)
     avaliacoes = [
         models.MovieReview(
             sk_movie_review_id=f"{filme.sk_movie_id}-{indice}",
@@ -152,6 +158,7 @@ async def criar_avaliacoes(
             nome=f"Avaliador {indice}",
             nota=float(indice % 11),
             comentario=f"Comentário {indice}",
+            created_at=momento,
         )
         for indice in range(quantidade)
     ]

@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAvaliacoes, useFilme, useRemoverFilme } from '../api/filmes'
 import type { MetricasFilme } from '../api/tipos'
 import { Estrelas } from '../components/Estrelas'
+import { FormularioAvaliacao } from '../components/FormularioAvaliacao'
 import { ListaAvaliacoes } from '../components/ListaAvaliacoes'
 import { ListaCreditos } from '../components/ListaCreditos'
 import { Mensagem } from '../components/Mensagem'
@@ -267,6 +268,8 @@ export function FilmeDetalhe() {
             )}
           </h2>
 
+          <FormularioAvaliacao filmeId={id} titulo={dados.titulo} />
+
           {avaliacoes.isPending ? (
             <p className={estilos.aguarde}>Carregando avaliações…</p>
           ) : avaliacoes.isError ? (
@@ -278,11 +281,11 @@ export function FilmeDetalhe() {
           ) : avaliacoes.data.items.length === 0 ? (
             <Mensagem
               titulo="Nenhuma avaliação ainda"
-              descricao="Este filme não recebeu resenhas."
+              descricao="Seja o primeiro a avaliar este filme."
             />
           ) : (
             <>
-              <ListaAvaliacoes avaliacoes={avaliacoes.data.items} />
+              <ListaAvaliacoes avaliacoes={avaliacoes.data.items} filmeId={id} />
               <Paginacao
                 pagina={avaliacoes.data.pagina}
                 paginas={avaliacoes.data.paginas}

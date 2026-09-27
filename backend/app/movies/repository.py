@@ -15,6 +15,7 @@ from app.movies.models import (
     DimGenre,
     DimMovie,
     DimPerson,
+    DimReview,
     FactMoviePerformance,
     MovieReview,
     PersonType,
@@ -453,3 +454,113 @@ async def remover_filme(sessao: AsyncSession, filme_id: str) -> bool:
     resultado = await sessao.execute(delete(DimMovie).where(DimMovie.sk_movie_id == filme_id))
     await sessao.commit()
     return resultado.rowcount > 0
+
+
+async def _reconciliar_agregado(sessao: AsyncSession, filme_id: str) -> None:
+    """Refaz a linha de ``dim_reviews`` a partir das avaliações do filme.
+
+    A média é **recalculada**, não ajustada por aritmética incremental. A conta
+    incremental — ``(media * qtd + nota) / (qtd + 1)`` — seria O(1) e teria três
+    defeitos: acumula erro de ponto flutuante a cada escrita, pressupõe que o
+    agregado já estava correto, e não sabe reagir a uma remoção feita por outro
+    caminho. Recalcular é auto-corretivo: cada escrita reconcilia o agregado com
+    a fonte de verdade.
+
+    O custo autoriza a escolha. São no máximo 13 avaliações por filme e 1,08 em
+    média; com o índice em ``sk_movie_id``, o recálculo custou 0,025 ms no filme
+    mais avaliado do catálogo.
+
+    A gravação é um upsert porque ``dim_reviews`` só tem linha para os 40.267
+    filmes já avaliados: avaliar um filme inédito significa criar a linha.
+    ``ON CONFLICT`` resolve isso numa instrução, sem a janela entre "verifica se
+    existe" e "insere" que um SELECT seguido de INSERT abriria.
+
+    Quando a última avaliação é removida, a linha é **apagada** em vez de zerada.
+    É o que mantém a invariante do esquema — existe agregado se, e somente se,
+    existem avaliações — a mesma que a carga inicial produz.
+    """
+
+    resumo = (
+        await sessao.execute(
+            select(func.count(), func.avg(MovieReview.nota)).where(
+                MovieReview.sk_movie_id == filme_id
+            )
+        )
+    ).one()
+    quantidade, media = resumo
+
+    if not quantidade:
+        await sessao.execute(delete(DimReview).where(DimReview.sk_movie_id == filme_id))
+        return
+
+    await sessao.execute(
+        sqlite_insert(DimReview)
+        .values(
+            sk_review_id=generate_surrogate_key(),
+            sk_movie_id=filme_id,
+            qtd_avaliacoes_usuarios=quantidade,
+            nota_media_usuarios=media,
+        )
+        .on_conflict_do_update(
+            index_elements=["sk_movie_id"],
+            set_={
+                "qtd_avaliacoes_usuarios": quantidade,
+                "nota_media_usuarios": media,
+            },
+        )
+    )
+
+
+async def criar_avaliacao(
+    sessao: AsyncSession, filme_id: str, *, nome: str, nota: float, comentario: str
+) -> MovieReview:
+    """Grava a avaliação e reconcilia o agregado na mesma transação.
+
+    As duas escritas são indissociáveis: uma avaliação sem o agregado atualizado
+    deixaria a nota média do catálogo mentindo até a próxima carga, e nada
+    apontaria o erro — o filme continuaria funcionando, exibindo a média antiga.
+    """
+
+    avaliacao = MovieReview(
+        sk_movie_id=filme_id,
+        nome=nome,
+        nota=nota,
+        comentario=comentario,
+    )
+    sessao.add(avaliacao)
+    # O flush leva o INSERT ao banco antes do recálculo, sem encerrar a
+    # transação: sem ele, a agregação não veria a avaliação que acabou de ser
+    # criada e devolveria o total anterior.
+    await sessao.flush()
+
+    await _reconciliar_agregado(sessao, filme_id)
+    await sessao.commit()
+    return avaliacao
+
+
+async def obter_avaliacao(
+    sessao: AsyncSession, filme_id: str, avaliacao_id: str
+) -> MovieReview | None:
+    """Busca uma avaliação exigindo que ela pertença ao filme informado.
+
+    O filtro por filme não é redundante. Sem ele, a rota aceitaria apagar a
+    avaliação de um filme através do endereço de outro, e o agregado reconciliado
+    seria o do filme errado.
+    """
+
+    consulta = select(MovieReview).where(
+        MovieReview.sk_movie_review_id == avaliacao_id,
+        MovieReview.sk_movie_id == filme_id,
+    )
+    return await sessao.scalar(consulta)
+
+
+async def remover_avaliacao(sessao: AsyncSession, avaliacao: MovieReview) -> None:
+    """Apaga a avaliação e reconcilia o agregado na mesma transação."""
+
+    filme_id = avaliacao.sk_movie_id
+    await sessao.delete(avaliacao)
+    await sessao.flush()
+
+    await _reconciliar_agregado(sessao, filme_id)
+    await sessao.commit()

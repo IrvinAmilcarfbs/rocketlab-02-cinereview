@@ -18,6 +18,7 @@ from app.core.texto import normalizar_busca
 from app.movies import repository
 from app.movies.models import DimGenre, DimMovie, FactMoviePerformance, MovieReview
 from app.movies.schemas import (
+    AvaliacaoEntrada,
     AvaliacaoResumo,
     FilmeDetalhe,
     FilmeEntrada,
@@ -218,12 +219,24 @@ async def obter_detalhe(sessao: AsyncSession, filme_id: str) -> FilmeDetalhe | N
 
 
 def para_avaliacao(avaliacao: MovieReview) -> AvaliacaoResumo:
+    """Achata uma avaliação no item exibido, marcando o instante como UTC.
+
+    ``created_at`` usa ``server_default=func.now()``, que no SQLite é
+    ``CURRENT_TIMESTAMP`` — sempre UTC — e volta do banco como data-hora **sem
+    fuso**. Serializada assim, o JavaScript a interpretaria como hora local:
+    em UTC-3, uma avaliação criada agora apareceria três horas no futuro.
+
+    Marcar o fuso aqui é o que torna o instante interpretável fora do servidor.
+    Vale para as 43.666 linhas carregadas também, porque elas receberam o mesmo
+    ``CURRENT_TIMESTAMP`` no momento da carga.
+    """
+
     return AvaliacaoResumo(
         id=avaliacao.sk_movie_review_id,
         nome=avaliacao.nome,
         nota=avaliacao.nota,
         comentario=avaliacao.comentario,
-        criado_em=avaliacao.created_at,
+        criado_em=avaliacao.created_at.replace(tzinfo=UTC),
     )
 
 
@@ -345,3 +358,37 @@ async def remover_filme(sessao: AsyncSession, filme_id: str) -> bool:
     """Apaga o filme e tudo que depende dele. Devolve se o filme existia."""
 
     return await repository.remover_filme(sessao, filme_id)
+
+
+async def criar_avaliacao(
+    sessao: AsyncSession, filme_id: str, entrada: AvaliacaoEntrada
+) -> AvaliacaoResumo | None:
+    """Registra uma avaliação. Devolve ``None`` se o filme não existir.
+
+    A existência do filme é verificada antes da escrita. A chave estrangeira
+    também a garantiria, mas o erro chegaria como falha de integridade — e o
+    cliente precisa distinguir "esse filme não existe" de "algo deu errado".
+    """
+
+    if not await repository.filme_existe(sessao, filme_id):
+        return None
+
+    avaliacao = await repository.criar_avaliacao(
+        sessao,
+        filme_id,
+        nome=entrada.nome,
+        nota=entrada.nota,
+        comentario=entrada.comentario,
+    )
+    return para_avaliacao(avaliacao)
+
+
+async def remover_avaliacao(sessao: AsyncSession, filme_id: str, avaliacao_id: str) -> bool:
+    """Apaga uma avaliação do filme. Devolve se havia o que apagar."""
+
+    avaliacao = await repository.obter_avaliacao(sessao, filme_id, avaliacao_id)
+    if avaliacao is None:
+        return False
+
+    await repository.remover_avaliacao(sessao, avaliacao)
+    return True

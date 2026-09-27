@@ -9,6 +9,7 @@ from app.core.pagination import Pagina, ParametrosPaginacao
 from app.db.session import get_db
 from app.movies import repository, service
 from app.movies.schemas import (
+    AvaliacaoEntrada,
     AvaliacaoResumo,
     FilmeDetalhe,
     FilmeEntrada,
@@ -20,6 +21,7 @@ from app.movies.service import GenerosDesconhecidos, Ordenacao
 router = APIRouter()
 
 IdFilme = Annotated[str, Path(description="Chave do filme (sk_movie_id).")]
+IdAvaliacao = Annotated[str, Path(description="Chave da avaliação (sk_movie_review_id).")]
 Sessao = Annotated[AsyncSession, Depends(get_db)]
 
 
@@ -188,3 +190,62 @@ async def listar_avaliacoes(
     if not await repository.filme_existe(sessao, filme_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filme não encontrado.")
     return await service.listar_avaliacoes(sessao, filme_id, parametros)
+
+
+@router.post(
+    "/{filme_id}/reviews",
+    response_model=AvaliacaoResumo,
+    status_code=status.HTTP_201_CREATED,
+    summary="Avalia um filme",
+    responses={
+        404: {"description": "Filme não encontrado"},
+        422: {"description": "Entrada inválida"},
+    },
+)
+async def criar_avaliacao(
+    filme_id: IdFilme,
+    entrada: Annotated[AvaliacaoEntrada, Body()],
+    sessao: Sessao,
+) -> AvaliacaoResumo:
+    """Registra a avaliação e atualiza a média do filme na mesma transação.
+
+    As duas escritas não podem se separar: ``movie_reviews`` é a fonte de verdade
+    e ``dim_reviews`` o agregado que o catálogo lê. Gravar só a primeira deixaria
+    a média mentindo, sem nenhum sintoma — o filme continuaria respondendo,
+    exibindo o valor anterior.
+    """
+
+    avaliacao = await service.criar_avaliacao(sessao, filme_id, entrada)
+    if avaliacao is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filme não encontrado.")
+    return avaliacao
+
+
+@router.delete(
+    "/{filme_id}/reviews/{avaliacao_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove uma avaliação",
+    responses={404: {"description": "Avaliação não encontrada neste filme"}},
+)
+async def remover_avaliacao(
+    filme_id: IdFilme,
+    avaliacao_id: IdAvaliacao,
+    sessao: Sessao,
+) -> Response:
+    """Apaga a avaliação e recalcula a média do filme.
+
+    A avaliação é endereçada **dentro** do filme, e a rota exige que ela realmente
+    pertença a ele. Aceitar o par trocado permitiria apagar a avaliação de um
+    filme pelo endereço de outro, e o agregado recalculado seria o do filme errado.
+
+    Removida a última avaliação, a linha do agregado deixa de existir — é assim
+    que o esquema representa "sem avaliações", e é o que a média nula no catálogo
+    já esperava.
+    """
+
+    if not await service.remover_avaliacao(sessao, filme_id, avaliacao_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Avaliação não encontrada neste filme.",
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

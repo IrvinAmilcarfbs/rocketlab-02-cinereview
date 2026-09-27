@@ -67,3 +67,83 @@
   white-space: pre-wrap;
   overflow-wrap: break-word;
 }
+
+.rodape {
+  display: flex;
+  gap: var(--esp-3);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: var(--esp-2);
+}
+
+.quando {
+  color: var(--cor-texto-fraco);
+  font-size: var(--txt-xs);
+}
+
+/* A ação de remover fica discreta até a linha receber o ponteiro: presente para
+   quem procura, sem competir com o texto da resenha. */
+.acaoRemover {
+  color: transparent;
+  font-family: inherit;
+  font-size: var(--txt-xs);
+  background: none;
+  border: none;
+  padding: 0;
+  transition: color var(--transicao);
+}
+
+.item:hover .acaoRemover,
+.acaoRemover:focus-visible {
+  color: var(--cor-texto-fraco);
+}
+
+.acaoRemover:hover {
+  color: var(--cor-erro);
+}
+
+.confirmacao {
+  display: inline-flex;
+  gap: var(--esp-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.pergunta {
+  color: var(--cor-texto-suave);
+  font-size: var(--txt-xs);
+}
+
+.confirmar,
+.manter {
+  padding: 2px var(--esp-2);
+  font-family: inherit;
+  font-size: var(--txt-xs);
+  background: none;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  transition: color var(--transicao), border-color var(--transicao);
+}
+
+.confirmar {
+  color: var(--cor-erro);
+  border-color: var(--cor-erro);
+}
+
+.confirmar:hover:not(:disabled) {
+  color: var(--cor-fundo);
+  background-color: var(--cor-erro);
+}
+
+.manter {
+  color: var(--cor-texto-suave);
+}
+
+.manter:hover:not(:disabled) {
+  color: var(--cor-texto);
+}
+
+.confirmar:disabled,
+.manter:disabled {
+  opacity: 0.5;
+}

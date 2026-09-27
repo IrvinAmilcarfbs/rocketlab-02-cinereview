@@ -111,3 +111,14 @@ export interface AvaliacaoResumo {
   comentario: string
   criado_em: string
 }
+
+/** Avaliação enviada por um usuário.
+ *
+ * `nota` vai de 0 a 10, como no banco. O seletor de estrelas produz inteiros de
+ * 1 a 10 (½ a 5 estrelas), mas o contrato acompanha a escala inteira.
+ */
+export interface AvaliacaoEntrada {
+  nome: string
+  nota: number
+  comentario: string
+}

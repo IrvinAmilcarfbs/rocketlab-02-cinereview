@@ -46,3 +46,83 @@ export async function buscar<T>(caminho: string, parametros?: Parametros): Promi
 
   return (await resposta.json()) as T
 }
+
+type Metodo = 'POST' | 'PUT' | 'DELETE'
+
+interface ItemValidacao {
+  loc?: (string | number)[]
+  msg?: string
+}
+
+/** Extrai uma mensagem legível do corpo de erro da API.
+ *
+ * O FastAPI usa a mesma chave `detail` para duas formas distintas: uma string,
+ * quando o erro vem de um `HTTPException` nosso, e uma lista de objetos, quando
+ * vem da validação do Pydantic. Sem tratar as duas, um 422 de validação
+ * apareceria como "[object Object]" para quem preencheu o formulário.
+ */
+function mensagemDoErro(corpo: unknown, padrao: string): string {
+  if (typeof corpo !== 'object' || corpo === null || !('detail' in corpo)) {
+    return padrao
+  }
+
+  const detalhe = (corpo as { detail: unknown }).detail
+
+  if (typeof detalhe === 'string') {
+    return detalhe
+  }
+
+  if (Array.isArray(detalhe)) {
+    const mensagens = (detalhe as ItemValidacao[])
+      .map((item) => {
+        // `loc` começa com "body"; o que interessa a quem lê é o campo.
+        const campo = item.loc?.filter((parte) => parte !== 'body').join('.')
+        return campo ? `${campo}: ${item.msg}` : item.msg
+      })
+      .filter((mensagem): mensagem is string => Boolean(mensagem))
+
+    if (mensagens.length > 0) {
+      return mensagens.join('; ')
+    }
+  }
+
+  return padrao
+}
+
+/** Executa uma escrita (POST, PUT, DELETE) e devolve o JSON quando existir.
+ *
+ * Diferente de `buscar`, aqui a mensagem do servidor importa: é ela que informa
+ * "Gêneros desconhecidos: Comedia" em vez de um erro genérico. Um 204 do DELETE
+ * não tem corpo, e tentar interpretá-lo como JSON lançaria exceção.
+ */
+export async function enviar<T>(metodo: Metodo, caminho: string, corpo?: unknown): Promise<T> {
+  const resposta = await fetch(`${BASE}${caminho}`, {
+    method: metodo,
+    headers: corpo === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: corpo === undefined ? undefined : JSON.stringify(corpo),
+  })
+
+  if (!resposta.ok) {
+    let dados: unknown = null
+    try {
+      dados = await resposta.json()
+    } catch {
+      // Resposta de erro sem corpo JSON: fica a mensagem padrão.
+    }
+    throw new ErroApi(
+      resposta.status,
+      mensagemDoErro(
+        dados,
+        resposta.status >= 500
+          ? 'O servidor não conseguiu concluir a operação.'
+          : 'Não foi possível concluir a operação.',
+      ),
+    )
+  }
+
+  if (resposta.status === 204) {
+    return undefined as T
+  }
+
+  return (await resposta.json()) as T
+}

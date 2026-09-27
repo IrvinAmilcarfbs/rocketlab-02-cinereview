@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import { TAMANHO_PAGINA, useCatalogo } from '../api/filmes'
+import type { Ordenacao } from '../api/tipos'
 import { BarraBusca } from '../components/BarraBusca'
 import { CardEsqueleto } from '../components/CardEsqueleto'
 import { FilmeCard } from '../components/FilmeCard'
@@ -16,17 +17,27 @@ function lerPagina(valor: string | null): number {
   return Number.isInteger(numero) && numero >= 1 ? numero : 1
 }
 
+/** Um valor desconhecido na URL cai no padrão em vez de virar erro. */
+function lerOrdenacao(valor: string | null): Ordenacao {
+  return valor === 'recentes' ? 'recentes' : 'popularidade'
+}
+
 export function Catalogo() {
   const [parametros, definirParametros] = useSearchParams()
   const pagina = lerPagina(parametros.get('pagina'))
   const busca = parametros.get('busca') ?? ''
+  const ordenar = lerOrdenacao(parametros.get('ordenar'))
 
   // O campo responde a cada tecla, mas só a pausa na digitação chega à URL —
   // e é a URL que alimenta a consulta.
   const [texto, setTexto] = useState(busca)
   const textoAdiado = useDebounce(texto)
 
-  const { data, isPending, isError, error, isFetching, refetch } = useCatalogo(pagina, busca)
+  const { data, isPending, isError, error, isFetching, refetch } = useCatalogo(
+    pagina,
+    busca,
+    ordenar,
+  )
 
   useEffect(() => {
     if (textoAdiado === busca) {
@@ -35,8 +46,15 @@ export function Catalogo() {
     // Trocar a busca recomeça da primeira página: a numeração antiga não
     // descreve mais o mesmo conjunto. `replace` evita encher o histórico com
     // um registro por tecla digitada.
-    definirParametros(textoAdiado ? { busca: textoAdiado } : {}, { replace: true })
-  }, [textoAdiado, busca, definirParametros])
+    const novos = new URLSearchParams()
+    if (textoAdiado) {
+      novos.set('busca', textoAdiado)
+    }
+    if (ordenar !== 'popularidade') {
+      novos.set('ordenar', ordenar)
+    }
+    definirParametros(novos, { replace: true })
+  }, [textoAdiado, busca, ordenar, definirParametros])
 
   // Mantém o campo coerente quando a URL muda por fora, como no botão voltar.
   // O ajuste acontece durante o render, e não em um efeito: é o padrão do React
@@ -53,11 +71,28 @@ export function Catalogo() {
     if (busca) {
       novos.set('busca', busca)
     }
+    if (ordenar !== 'popularidade') {
+      novos.set('ordenar', ordenar)
+    }
     if (destino > 1) {
       novos.set('pagina', String(destino))
     }
     definirParametros(novos)
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function mudarOrdenacao(nova: Ordenacao) {
+    // Trocar a ordem recomeça da primeira página: a numeração antiga descreve
+    // outra sequência. A busca é preservada, mas a ordenação não a afeta — o
+    // backend a ignora durante a busca, e o rótulo diz isso.
+    const novos = new URLSearchParams()
+    if (busca) {
+      novos.set('busca', busca)
+    }
+    if (nova !== 'popularidade') {
+      novos.set('ordenar', nova)
+    }
+    definirParametros(novos)
   }
 
   function renderizarConteudo() {
@@ -143,11 +178,41 @@ export function Catalogo() {
           Cine<span className={estilos.marcaDestaque}>log</span>
         </h1>
 
-        <BarraBusca
-          valor={texto}
-          onMudar={setTexto}
-          carregando={isFetching && texto !== busca}
-        />
+        <div className={estilos.controles}>
+          <BarraBusca
+            valor={texto}
+            onMudar={setTexto}
+            carregando={isFetching && texto !== busca}
+          />
+
+          <Link to="/filmes/novo" className={estilos.novo}>
+            + Novo filme
+          </Link>
+        </div>
+
+        {/* O seletor só aparece fora da busca, porque é só aí que ele tem
+            efeito: durante a busca a ordem é a popularidade dentro dos grupos de
+            título repetido. Exibir um controle inerte seria pior que omiti-lo. */}
+        {!busca && (
+          <div className={estilos.ordenacao} role="group" aria-label="Ordenar catálogo">
+            <button
+              type="button"
+              className={ordenar === 'popularidade' ? estilos.ordemAtiva : estilos.ordem}
+              aria-pressed={ordenar === 'popularidade'}
+              onClick={() => mudarOrdenacao('popularidade')}
+            >
+              Mais populares
+            </button>
+            <button
+              type="button"
+              className={ordenar === 'recentes' ? estilos.ordemAtiva : estilos.ordem}
+              aria-pressed={ordenar === 'recentes'}
+              onClick={() => mudarOrdenacao('recentes')}
+            >
+              Adicionados recentemente
+            </button>
+          </div>
+        )}
 
         <p className={estilos.subtitulo} aria-live="polite">
           {descreverResultado()}

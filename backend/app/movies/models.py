@@ -24,6 +24,7 @@ from sqlalchemy import (
     UniqueConstraint,
     event,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -116,6 +117,25 @@ class DimMovie(Base):
     sinopse: Mapped[str | None] = mapped_column(String(4000), default=None)
     url_poster: Mapped[str | None] = mapped_column(String(2048), default=None)
     url_backdrop: Mapped[str | None] = mapped_column(String(2048), default=None)
+    # Instante em que o filme foi cadastrado pela aplicação. Nulo nas 95.645
+    # linhas vindas dos CSVs: não sabemos quando o TMDB as criou, e inventar uma
+    # data seria pior que admitir a ausência. É o que separa "o acervo" do "que
+    # eu cadastrei aqui", e o que permite a ordenação por recentes.
+    criado_em: Mapped[datetime | None] = mapped_column(default=None)
+
+    # Índice parcial: só as linhas cadastradas aqui entram nele. Um índice sobre
+    # as 95 mil linhas seria quase todo composto do mesmo NULL, custando escrita
+    # e espaço sem economizar leitura. Assim ele nasce minúsculo e atende a
+    # ordenação por recentes com uma varredura de índice, sem ordenação
+    # temporária.
+    __table_args__ = (
+        Index(
+            "ix_dim_movies_criado_em",
+            "criado_em",
+            "sk_movie_id",
+            sqlite_where=text("criado_em IS NOT NULL"),
+        ),
+    )
 
     genres: Mapped[list["DimGenre"]] = relationship(
         secondary=bridge_movie_genre, back_populates="movies", order_by="DimGenre.nome_genero"

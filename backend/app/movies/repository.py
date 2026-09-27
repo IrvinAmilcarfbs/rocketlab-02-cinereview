@@ -6,11 +6,20 @@ para o contrato da API é responsabilidade do serviço.
 
 from collections.abc import Sequence
 
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, select, text
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from app.movies.models import DimMovie, FactMoviePerformance, MovieReview
+from app.movies.models import (
+    DimGenre,
+    DimMovie,
+    DimPerson,
+    FactMoviePerformance,
+    MovieReview,
+    PersonType,
+    generate_surrogate_key,
+)
 
 
 async def contar_filmes(sessao: AsyncSession) -> int:
@@ -30,8 +39,22 @@ async def contar_filmes(sessao: AsyncSession) -> int:
     return await sessao.scalar(consulta) or 0
 
 
-async def listar_filmes(sessao: AsyncSession, offset: int, limite: int) -> Sequence[DimMovie]:
+async def listar_filmes(
+    sessao: AsyncSession, offset: int, limite: int, *, somente_acervo: bool = False
+) -> Sequence[DimMovie]:
     """Retorna uma página do catálogo ordenada por popularidade.
+
+    ``somente_acervo`` exclui os filmes cadastrados pela aplicação. Serve à
+    ordenação por recentes, que os exibe antes desta lista e não pode repeti-los
+    aqui.
+
+    A exclusão é escrita como ``NOT IN`` sobre a chave do **fato**, e não como
+    ``WHERE dim_movies.criado_em IS NULL``, porque a diferença é grande no fim do
+    catálogo. O filtro na dimensão obriga a consultar a tabela ``dim_movies``
+    linha a linha e desfaz o índice coberto; o ``NOT IN`` deixa o SQLite
+    materializar a lista uma única vez, pelo índice parcial, e comparar contra a
+    chave que ele já tem em mãos. Medido na página 4.782: 174 ms contra 497 ms,
+    frente aos 173 ms da consulta sem filtro algum.
 
     Duas decisões de carregamento importam aqui:
 
@@ -73,6 +96,55 @@ async def listar_filmes(sessao: AsyncSession, offset: int, limite: int) -> Seque
             FactMoviePerformance.popularidade.desc(),
             FactMoviePerformance.sk_movie_id.desc(),
         )
+        .offset(offset)
+        .limit(limite)
+    )
+    if somente_acervo:
+        # `sk_movie_id` é chave primária, portanto nunca nula. Isso importa mais
+        # do que parece: um único nulo na subconsulta faria `NOT IN` avaliar para
+        # nulo em toda linha, e o catálogo voltaria vazio sem erro nenhum.
+        cadastrados = select(DimMovie.sk_movie_id).where(DimMovie.criado_em.is_not(None))
+        consulta = consulta.where(FactMoviePerformance.sk_movie_id.not_in(cadastrados))
+    return (await sessao.scalars(consulta)).all()
+
+
+async def contar_cadastrados(sessao: AsyncSession) -> int:
+    """Quantos filmes foram cadastrados pela aplicação.
+
+    O join com o fato não é decorativo: este número define o deslocamento entre
+    os dois blocos da ordenação por recentes. Se contasse filmes que a listagem
+    não exibe, a paginação passaria a pular ou repetir um registro na fronteira.
+    """
+
+    consulta = (
+        select(func.count())
+        .select_from(DimMovie)
+        .join(FactMoviePerformance, FactMoviePerformance.sk_movie_id == DimMovie.sk_movie_id)
+        .where(DimMovie.criado_em.is_not(None))
+    )
+    return await sessao.scalar(consulta) or 0
+
+
+async def listar_cadastrados(sessao: AsyncSession, offset: int, limite: int) -> Sequence[DimMovie]:
+    """Filmes cadastrados aqui, do mais recente para o mais antigo.
+
+    O índice parcial ``(criado_em, sk_movie_id)`` atende esta ordenação por
+    varredura reversa, sem ordenação temporária — o SQLite traduz o
+    ``IS NOT NULL`` em uma busca por faixa dentro do índice.
+
+    O desempate por ``sk_movie_id`` cobre dois cadastros no mesmo instante: sem
+    ordem total, a paginação voltaria a ser indefinida entre eles.
+    """
+
+    consulta = (
+        select(DimMovie)
+        .join(FactMoviePerformance, FactMoviePerformance.sk_movie_id == DimMovie.sk_movie_id)
+        .where(DimMovie.criado_em.is_not(None))
+        .options(
+            selectinload(DimMovie.genres),
+            joinedload(DimMovie.reviews_summary),
+        )
+        .order_by(DimMovie.criado_em.desc(), DimMovie.sk_movie_id.desc())
         .offset(offset)
         .limit(limite)
     )
@@ -271,3 +343,113 @@ async def buscar_filmes(
     )
     encontrados = {filme.sk_movie_id: filme for filme in (await sessao.scalars(consulta)).all()}
     return [encontrados[chave] for chave in ids if chave in encontrados]
+
+
+async def listar_generos(sessao: AsyncSession) -> Sequence[DimGenre]:
+    """Vocabulário de gêneros, em ordem alfabética.
+
+    São 19 valores fechados, vindos dos CSVs. O formulário precisa deles para
+    oferecer uma escolha em vez de um campo livre — texto livre criaria "Ação"
+    ao lado de "Action" e duplicaria a dimensão.
+    """
+
+    return (await sessao.scalars(select(DimGenre).order_by(DimGenre.nome_genero))).all()
+
+
+async def buscar_generos_por_nome(sessao: AsyncSession, nomes: Sequence[str]) -> list[DimGenre]:
+    """Resolve nomes de gênero em entidades, na ordem em que foram pedidos.
+
+    Nomes desconhecidos simplesmente não aparecem no resultado. Quem chama
+    compara as quantidades e decide o que fazer — o repositório não conhece o
+    contrato HTTP.
+    """
+
+    if not nomes:
+        return []
+
+    encontrados = (
+        await sessao.scalars(select(DimGenre).where(DimGenre.nome_genero.in_(nomes)))
+    ).all()
+    por_nome = {genero.nome_genero: genero for genero in encontrados}
+    return [por_nome[nome] for nome in nomes if nome in por_nome]
+
+
+async def obter_ou_criar_pessoa(sessao: AsyncSession, nome: str, tipo: PersonType) -> DimPerson:
+    """Reaproveita a pessoa existente ou cria uma nova.
+
+    ``(nome_pessoa, tipo_pessoa)`` é UNIQUE, e é isso que impede a dimensão de
+    duplicar: digitar um diretor que já existe entre os 65.200 cadastrados
+    reaproveita a linha em vez de criar uma segunda.
+
+    A inserção usa ``ON CONFLICT DO NOTHING`` em vez de inserir e tratar o erro.
+    Entre o SELECT e a escrita, outra requisição pode criar a mesma pessoa; um
+    ``IntegrityError`` aqui derrubaria a transação inteira do cadastro, e o
+    filme não seria gravado por causa de um diretor homônimo.
+    """
+
+    consulta = select(DimPerson).where(DimPerson.nome_pessoa == nome, DimPerson.tipo_pessoa == tipo)
+    pessoa = await sessao.scalar(consulta)
+    if pessoa is not None:
+        return pessoa
+
+    await sessao.execute(
+        sqlite_insert(DimPerson)
+        .values(
+            sk_person_id=generate_surrogate_key(),
+            nome_pessoa=nome,
+            tipo_pessoa=tipo,
+        )
+        .on_conflict_do_nothing(index_elements=["nome_pessoa", "tipo_pessoa"])
+    )
+    pessoa = await sessao.scalar(consulta)
+    if pessoa is None:  # pragma: no cover - só ocorreria com a UNIQUE ausente
+        raise RuntimeError(f"Não foi possível obter a pessoa {nome!r} ({tipo}).")
+    return pessoa
+
+
+async def obter_filme_para_edicao(sessao: AsyncSession, filme_id: str) -> DimMovie | None:
+    """Carrega o filme com as coleções que a atualização substitui.
+
+    Só gêneros e pessoas vêm carregados. Substituir uma coleção exige conhecer o
+    conteúdo atual — sem isso o SQLAlchemy não sabe quais vínculos apagar — e as
+    demais relações não são tocadas pela atualização.
+    """
+
+    consulta = (
+        select(DimMovie)
+        .where(DimMovie.sk_movie_id == filme_id)
+        .options(selectinload(DimMovie.genres), selectinload(DimMovie.people))
+    )
+    return await sessao.scalar(consulta)
+
+
+async def gravar_filme(sessao: AsyncSession, filme: DimMovie) -> None:
+    """Persiste um filme novo com tudo que pende na sessão, numa transação.
+
+    O filme chega montado com fato, gêneros e diretores. As cinco tabelas são
+    gravadas no mesmo commit: um cadastro parcial deixaria um filme fora do
+    catálogo ou um vínculo apontando para o vazio.
+    """
+
+    sessao.add(filme)
+    await sessao.commit()
+
+
+async def confirmar(sessao: AsyncSession) -> None:
+    """Fecha a transação de uma atualização já aplicada às entidades."""
+
+    await sessao.commit()
+
+
+async def remover_filme(sessao: AsyncSession, filme_id: str) -> bool:
+    """Apaga o filme e tudo que depende dele. Devolve se havia o que apagar.
+
+    Uma única instrução basta: as chaves estrangeiras usam ``ON DELETE CASCADE``
+    e o ``PRAGMA foreign_keys=ON`` está ligado em cada conexão, então o próprio
+    banco remove as bridges, o fato, o agregado e as avaliações. Carregar o grafo
+    no ORM para apagá-lo em Python seria mais lento e mais frágil.
+    """
+
+    resultado = await sessao.execute(delete(DimMovie).where(DimMovie.sk_movie_id == filme_id))
+    await sessao.commit()
+    return resultado.rowcount > 0

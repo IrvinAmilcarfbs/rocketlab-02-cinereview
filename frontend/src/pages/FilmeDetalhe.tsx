@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
-import { useAvaliacoes, useFilme } from '../api/filmes'
+import { useAvaliacoes, useFilme, useRemoverFilme } from '../api/filmes'
 import type { MetricasFilme } from '../api/tipos'
 import { Estrelas } from '../components/Estrelas'
 import { ListaAvaliacoes } from '../components/ListaAvaliacoes'
@@ -72,9 +73,20 @@ export function FilmeDetalhe() {
 
   const filme = useFilme(id)
   const avaliacoes = useAvaliacoes(id, paginaAvaliacoes)
+  const remover = useRemoverFilme()
+  const [confirmando, setConfirmando] = useState(false)
 
   function irParaAvaliacoes(destino: number) {
     definirParametros(destino === 1 ? {} : { avaliacoes: String(destino) })
+  }
+
+  function excluir() {
+    remover.mutate(id, {
+      // A navegação acontece no sucesso, não antes: se a remoção falhar, o
+      // usuário continua na página e vê o motivo, em vez de ser levado ao
+      // catálogo acreditando que deu certo.
+      onSuccess: () => navegar('/', { replace: true }),
+    })
   }
 
   if (filme.isPending) {
@@ -118,9 +130,70 @@ export function FilmeDetalhe() {
       />
 
       <div className={estilos.conteudo}>
-        <Link to="/" className={estilos.voltar}>
-          ← Voltar ao catálogo
-        </Link>
+        <div className={estilos.barraTopo}>
+          <Link to="/" className={estilos.voltar}>
+            ← Voltar ao catálogo
+          </Link>
+
+          <div className={estilos.acoes}>
+            <Link to={`/filmes/${id}/editar`} className={estilos.editar}>
+              Editar
+            </Link>
+            <button
+              type="button"
+              className={estilos.excluir}
+              onClick={() => setConfirmando(true)}
+            >
+              Excluir
+            </button>
+          </div>
+        </div>
+
+        {/* Confirmação em painel, e não `window.confirm`: o diálogo do navegador
+            não pode dizer o que será apagado junto, que é justamente a
+            informação que faz a confirmação valer algo. */}
+        {confirmando && (
+          <div className={estilos.confirmacao} role="alertdialog" aria-label="Confirmar exclusão">
+            <p className={estilos.confirmacaoTexto}>
+              Excluir <strong>{filme.data.titulo}</strong> em definitivo?
+              {filme.data.qtd_avaliacoes > 0 && (
+                <>
+                  {' '}
+                  As {filme.data.qtd_avaliacoes}{' '}
+                  {filme.data.qtd_avaliacoes === 1 ? 'avaliação' : 'avaliações'} também
+                  {filme.data.qtd_avaliacoes === 1 ? ' será' : ' serão'} removidas.
+                </>
+              )}
+            </p>
+
+            {remover.isError && (
+              <p className={estilos.confirmacaoErro} role="alert">
+                {remover.error instanceof Error
+                  ? remover.error.message
+                  : 'Não foi possível excluir o filme.'}
+              </p>
+            )}
+
+            <div className={estilos.confirmacaoAcoes}>
+              <button
+                type="button"
+                className={estilos.confirmar}
+                disabled={remover.isPending}
+                onClick={excluir}
+              >
+                {remover.isPending ? 'Excluindo…' : 'Sim, excluir'}
+              </button>
+              <button
+                type="button"
+                className={estilos.manter}
+                disabled={remover.isPending}
+                onClick={() => setConfirmando(false)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className={estilos.topo}>
           <div className={estilos.posterArea}>

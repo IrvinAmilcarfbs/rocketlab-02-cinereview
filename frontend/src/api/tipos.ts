@@ -77,6 +77,32 @@ export interface FilmeDetalhe {
   qtd_avaliacoes: number
 }
 
+/** Valores de `status_filme` presentes na base. É um conjunto fechado. */
+export type StatusFilme = 'Lançado' | 'Pós-Produção' | 'Em Produção' | 'Planejado'
+
+/** Ordem do catálogo. `recentes` exibe primeiro o que foi cadastrado aqui. */
+export type Ordenacao = 'popularidade' | 'recentes'
+
+/** Subconjunto editável de um filme, no cadastro e na atualização.
+ *
+ * Espelha `FilmeEntrada` no backend. O `PUT` substitui este subconjunto
+ * inteiro: o que o formulário mostra em branco fica em branco. Campos fora
+ * daqui — popularidade, notas externas, financeiro, backdrop, elenco,
+ * roteiristas e produtoras — não são alcançados pelo formulário.
+ */
+export interface FilmeEntrada {
+  titulo: string
+  ano: number | null
+  sinopse: string | null
+  duracao_minutos: number | null
+  status: StatusFilme | null
+  poster_url: string | null
+  /** Nomes de gêneros existentes; o backend recusa os desconhecidos. */
+  generos: string[]
+  /** Nomes de diretores; os que ainda não existem são criados. */
+  diretores: string[]
+}
+
 export interface AvaliacaoResumo {
   id: string
   nome: string

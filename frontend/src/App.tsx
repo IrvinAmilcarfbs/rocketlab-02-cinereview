@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ErroApi } from './api/cliente'
 import { Catalogo } from './pages/Catalogo'
 import { FilmeDetalhe } from './pages/FilmeDetalhe'
+import { FilmeFormulario } from './pages/FilmeFormulario'
 
 const clienteQuery = new QueryClient({
   defaultOptions: {
@@ -28,6 +29,11 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Catalogo />} />
+          {/* A rota literal vem antes da paramétrica: o React Router escolhe a
+              mais específica, mas declarar nesta ordem torna a intenção óbvia e
+              evita que "novo" seja lido como identificador de filme. */}
+          <Route path="/filmes/novo" element={<FilmeFormulario />} />
+          <Route path="/filmes/:id/editar" element={<FilmeFormulario />} />
           <Route path="/filmes/:id" element={<FilmeDetalhe />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

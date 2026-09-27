@@ -271,3 +271,110 @@
     text-align: left;
   }
 }
+
+.barraTopo {
+  display: flex;
+  gap: var(--esp-4);
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.acoes {
+  display: flex;
+  gap: var(--esp-2);
+  align-items: center;
+}
+
+.editar,
+.excluir {
+  padding: var(--esp-2) var(--esp-4);
+  font-family: inherit;
+  font-size: var(--txt-sm);
+  background: none;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  transition: color var(--transicao), border-color var(--transicao);
+}
+
+.editar {
+  color: var(--cor-texto-suave);
+}
+
+.editar:hover {
+  color: var(--cor-destaque);
+  border-color: var(--cor-destaque);
+}
+
+.excluir {
+  color: var(--cor-texto-suave);
+}
+
+.excluir:hover {
+  color: var(--cor-erro);
+  border-color: var(--cor-erro);
+}
+
+.confirmacao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+  margin-top: var(--esp-4);
+  padding: var(--esp-4);
+  background-color: var(--cor-superficie);
+  border: 1px solid var(--cor-erro);
+  border-radius: var(--raio-lg);
+}
+
+.confirmacaoTexto {
+  color: var(--cor-texto);
+  font-size: var(--txt-sm);
+  line-height: 1.6;
+}
+
+.confirmacaoErro {
+  color: var(--cor-erro);
+  font-size: var(--txt-sm);
+}
+
+.confirmacaoAcoes {
+  display: flex;
+  gap: var(--esp-3);
+  align-items: center;
+}
+
+.confirmar {
+  padding: var(--esp-2) var(--esp-4);
+  color: var(--cor-fundo);
+  font-family: inherit;
+  font-size: var(--txt-sm);
+  font-weight: 600;
+  background-color: var(--cor-erro);
+  border: none;
+  border-radius: var(--raio);
+  transition: opacity var(--transicao);
+}
+
+.confirmar:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.confirmar:disabled,
+.manter:disabled {
+  opacity: 0.5;
+}
+
+.manter {
+  padding: var(--esp-2) var(--esp-4);
+  color: var(--cor-texto-suave);
+  font-family: inherit;
+  font-size: var(--txt-sm);
+  background: none;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  transition: color var(--transicao);
+}
+
+.manter:hover:not(:disabled) {
+  color: var(--cor-texto);
+}

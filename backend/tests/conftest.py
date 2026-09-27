@@ -6,6 +6,7 @@ cada conexão do pool enxergaria um banco vazio e diferente.
 """
 
 from collections.abc import AsyncIterator
+from datetime import datetime
 from uuid import uuid4
 
 import pytest
@@ -14,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from app.db.base import Base
-from app.db.session import get_db
+from app.db.session import enable_sqlite_foreign_keys, get_db
 from app.main import app
 from app.movies import models
 
@@ -28,6 +29,11 @@ async def sessao() -> AsyncIterator[AsyncSession]:
         poolclass=StaticPool,
         connect_args={"check_same_thread": False},
     )
+    # Mesmo pragma que a aplicação aplica em cada conexão. Sem ele o banco de
+    # teste ignora ON DELETE CASCADE, e uma remoção deixaria fato, agregado,
+    # avaliações e vínculos órfãos sem que nenhum teste percebesse — o ambiente
+    # de teste diria "passou" sobre um comportamento que produção não tem.
+    enable_sqlite_foreign_keys(motor)
     async with motor.begin() as conexao:
         await conexao.run_sync(Base.metadata.create_all)
 
@@ -63,6 +69,7 @@ async def criar_filme(
     nota_media: float | None = None,
     qtd_avaliacoes: int = 0,
     com_fato: bool = True,
+    criado_em: datetime | None = None,
 ) -> models.DimMovie:
     """Cria um filme com suas relações, refletindo o que a carga produz.
 
@@ -80,6 +87,10 @@ async def criar_filme(
         titulo=titulo,
         ano_lancamento=2024,
         url_poster=f"https://exemplo/{titulo}.jpg",
+        # Nulo reproduz o acervo carregado; preenchido, um filme cadastrado aqui.
+        # Os testes de ordenação passam o instante de propósito: dois cadastros
+        # no mesmo microssegundo desempatariam pela chave, que é aleatória.
+        criado_em=criado_em,
     )
     for nome in generos:
         existente = await sessao.get(models.DimGenre, nome)
@@ -108,6 +119,20 @@ async def criar_filme(
     sessao.add(filme)
     await sessao.commit()
     return filme
+
+
+async def criar_generos(sessao: AsyncSession, *nomes: str) -> list[models.DimGenre]:
+    """Popula o vocabulário fechado de gêneros.
+
+    O banco em memória nasce vazio, e o cadastro recusa gêneros que não existem
+    na dimensão — então os testes de escrita precisam declarar o vocabulário que
+    vão usar.
+    """
+
+    generos = [models.DimGenre(sk_genre_id=nome, nome_genero=nome) for nome in nomes]
+    sessao.add_all(generos)
+    await sessao.commit()
+    return generos
 
 
 async def criar_avaliacoes(

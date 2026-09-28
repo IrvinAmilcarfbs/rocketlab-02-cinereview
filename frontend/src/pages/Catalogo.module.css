@@ -29,11 +29,15 @@
 }
 
 /* `auto-fill` com largura mínima dá responsividade sem media queries: a grade
-   acomoda quantas colunas couberem na largura disponível. */
+   acomoda quantas colunas couberem na largura disponível.
+ *
+ * Os cartões crescem no ponteiro, e o crescimento é `transform` — que não ocupa
+ * espaço no fluxo. O vão precisa ser maior que a folga do crescimento, senão o
+ * cartão em destaque encostaria no vizinho. */
 .grade {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: var(--esp-4);
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: var(--esp-6) var(--esp-4);
   transition: opacity var(--transicao);
 }
 
@@ -54,8 +58,8 @@
 @media (width <= 480px) {
   .grade,
   .gradeAtualizando {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: var(--esp-3);
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--esp-4) var(--esp-3);
   }
 }
 

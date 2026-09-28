@@ -1,27 +1,30 @@
-.card {
-  display: flex;
-  flex-direction: column;
+.cartao {
+  position: relative;
+  display: block;
   overflow: hidden;
+  /* Proporção padrão de pôster de cinema. Fixá-la no cartão inteiro — e não
+     numa capa interna — é o que garante altura idêntica em toda a fileira,
+     independentemente do texto. */
+  aspect-ratio: 2 / 3;
   background-color: var(--cor-superficie);
-  border: 1px solid var(--cor-borda);
   border-radius: var(--raio-lg);
   transition:
-    transform var(--transicao),
-    border-color var(--transicao),
-    box-shadow var(--transicao);
+    transform var(--transicao-suave),
+    box-shadow var(--transicao-suave);
 }
 
-.card:hover {
-  transform: translateY(-3px);
-  border-color: var(--cor-borda-forte);
+.cartao:hover,
+.cartao:focus-visible {
+  transform: scale(1.04);
   box-shadow: var(--sombra-alta);
+  /* Sobe acima dos vizinhos, senão o cartão seguinte cobriria a borda do que
+     cresceu. */
+  z-index: 1;
 }
 
-.capa {
-  /* Proporção padrão de pôster de cinema. Fixá-la evita que a grade salte
-     conforme as imagens carregam. */
-  aspect-ratio: 2 / 3;
-  background-color: var(--cor-superficie-alta);
+.cartao:focus-visible {
+  outline: 2px solid var(--cor-destaque);
+  outline-offset: 3px;
 }
 
 .imagem {
@@ -30,79 +33,148 @@
   object-fit: cover;
 }
 
-.semCapa {
-  display: grid;
-  place-items: center;
+/* 8,6% do catálogo não tem pôster. Um retângulo chapado parecia defeito, então
+   a ausência ganha um desenho próprio: um degradê tingido com o matiz que o
+   componente deriva do id do filme, um ícone de rolo de película e o título —
+   que aqui fica sempre visível, porque não há imagem a revelar no ponteiro.
+ *
+ * A saturação é baixa de propósito: estes cartões dividem a fileira com
+ * pôsteres reais e não podem competir com eles. */
+.capaVazia {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+  align-items: center;
+  justify-content: center;
+  width: 100%;
   height: 100%;
   padding: var(--esp-4);
-  color: var(--cor-texto-fraco);
-  font-size: var(--txt-sm);
-  font-weight: 600;
-  text-align: center;
+  background: linear-gradient(
+    160deg,
+    hsl(var(--matiz, 0) 24% 17%),
+    hsl(var(--matiz, 0) 18% 10%)
+  );
 }
 
+.marca {
+  width: 28px;
+  height: 28px;
+  fill: currentcolor;
+  color: hsl(var(--matiz, 0) 30% 62%);
+  opacity: 0.55;
+}
+
+.tituloSemCapa {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--cor-texto-suave);
+  font-size: var(--txt-sm);
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  transition: opacity var(--transicao-suave);
+}
+
+/* O título do centro e o da faixa são complementares, nunca simultâneos: o do
+   centro existe porque, sem pôster, o cartão em repouso não teria nada escrito.
+   Quando a faixa aparece ela traz o mesmo título com ano e nota, e manter os
+   dois faria o cartão repetir o título para si mesmo. */
+.cartao:hover .tituloSemCapa,
+.cartao:focus-visible .tituloSemCapa {
+  opacity: 0;
+}
+
+/* A faixa de informação cobre o rodapé do pôster. O degradê sobe bem além do
+   texto para que letras claras nunca caiam sobre uma parte clara da imagem. */
 .info {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
-  flex: 1;
   flex-direction: column;
   gap: var(--esp-1);
-  padding: var(--esp-3);
+  padding: var(--esp-6) var(--esp-3) var(--esp-3);
+  background: linear-gradient(to top, rgb(0 0 0 / 92%) 35%, transparent);
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity var(--transicao-suave),
+    transform var(--transicao-suave);
+}
+
+.cartao:hover .info,
+.cartao:focus-visible .info {
+  opacity: 1;
+  transform: none;
 }
 
 .titulo {
   display: -webkit-box;
   overflow: hidden;
+  color: #fff;
   font-size: var(--txt-sm);
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-.ano {
-  color: var(--cor-texto-fraco);
-  font-size: var(--txt-xs);
-}
-
-.generos {
+.linha {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--esp-1);
-  margin: var(--esp-1) 0;
-  padding: 0;
-  list-style: none;
-}
-
-.generos li {
-  padding: 2px var(--esp-2);
-  color: var(--cor-texto-suave);
-  font-size: var(--txt-xs);
-  background-color: var(--cor-superficie-alta);
-  border-radius: var(--raio);
-}
-
-.avaliacao {
-  display: flex;
-  align-items: center;
   gap: var(--esp-2);
-  /* Empurra a avaliação para a base, alinhando-a entre cards de alturas
-     diferentes. */
-  margin-top: auto;
-  padding-top: var(--esp-2);
+  align-items: center;
+  justify-content: space-between;
 }
 
-.quantidade {
+.ano {
   color: var(--cor-texto-suave);
   font-size: var(--txt-xs);
   font-variant-numeric: tabular-nums;
 }
 
-.separador {
-  margin: 0 var(--esp-1);
-  color: var(--cor-texto-fraco);
+.nota {
+  display: flex;
+  gap: var(--esp-1);
+  align-items: center;
+  flex-shrink: 0;
 }
 
-.semNota {
-  color: var(--cor-texto-fraco);
+.valor {
+  color: var(--cor-texto);
   font-size: var(--txt-xs);
-  font-style: italic;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Em telas sem ponteiro não existe hover, e a informação ficaria inalcançável.
+   Ali ela é permanente — a `hover: none` descreve exatamente essa condição,
+   enquanto uma media query de largura acertaria por acidente. */
+@media (hover: none) {
+  .info {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* A faixa é permanente aqui, então o título do centro seria sempre uma
+     repetição; sobram o ícone e o fundo tingido, que é o que dá identidade ao
+     cartão sem pôster. */
+  .tituloSemCapa {
+    display: none;
+  }
+
+  .cartao:hover {
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cartao:hover,
+  .cartao:focus-visible {
+    transform: none;
+  }
 }

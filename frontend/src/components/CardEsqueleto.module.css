@@ -1,33 +1,8 @@
-.card {
-  overflow: hidden;
-  background-color: var(--cor-superficie);
-  border: 1px solid var(--cor-borda);
-  border-radius: var(--raio-lg);
-}
-
-.capa {
+.cartao {
   aspect-ratio: 2 / 3;
-  background-color: var(--cor-superficie-alta);
+  background-color: var(--cor-superficie);
+  border-radius: var(--raio-lg);
   animation: pulsar 1.4s ease-in-out infinite;
-}
-
-.info {
-  display: flex;
-  flex-direction: column;
-  gap: var(--esp-2);
-  padding: var(--esp-3);
-}
-
-.linha,
-.linhaCurta {
-  height: 12px;
-  background-color: var(--cor-superficie-alta);
-  border-radius: var(--raio);
-  animation: pulsar 1.4s ease-in-out infinite;
-}
-
-.linhaCurta {
-  width: 45%;
 }
 
 @keyframes pulsar {
@@ -38,5 +13,11 @@
 
   50% {
     opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cartao {
+    animation: none;
   }
 }

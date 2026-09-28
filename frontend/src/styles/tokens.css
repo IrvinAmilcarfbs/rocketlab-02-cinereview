@@ -1,30 +1,49 @@
-/* Design system mínimo do catálogo.
+/* Design system do catálogo.
  *
  * Tema escuro: pôsteres são o conteúdo principal da tela e se destacam muito
  * melhor sobre fundo escuro — é a convergência de praticamente todo serviço de
- * cinema, incluindo o Letterboxd citado no enunciado.
+ * cinema.
+ *
+ * A referência visual é a linguagem dos grandes catálogos de streaming: preto
+ * quase puro em vez de cinza-azulado, superfícies separadas por luminosidade e
+ * não por borda, e um acento quente e saturado usado com parcimônia. O vermelho
+ * é derivado dessa referência sem ser a cor de marca de nenhum serviço.
  *
  * Os espaçamentos seguem uma escala de 4px para que o ritmo vertical seja
  * consistente sem depender de valores arbitrários.
  */
 
 :root {
-  /* Superfícies, da mais profunda à mais elevada */
-  --cor-fundo: #14181c;
-  --cor-superficie: #1c2228;
-  --cor-superficie-alta: #2c3440;
-  --cor-borda: #2c3440;
-  --cor-borda-forte: #3d4654;
+  /* Superfícies, da mais profunda à mais elevada.
+   *
+   * O fundo é quase preto de propósito: o cinza-azulado anterior (#14181c)
+   * roubava saturação dos pôsteres, que são a única fonte de cor da tela. */
+  --cor-fundo: #0e0e10;
+  --cor-superficie: #17171a;
+  --cor-superficie-alta: #232326;
+  --cor-borda: #26262b;
+  --cor-borda-forte: #3c3c43;
 
   /* Texto */
-  --cor-texto: #e8eaed;
-  --cor-texto-suave: #99aabb;
-  --cor-texto-fraco: #6b7a8a;
+  --cor-texto: #f5f5f7;
+  --cor-texto-suave: #b3b3b3;
+  --cor-texto-fraco: #7b7b83;
 
-  /* Acentos */
-  --cor-destaque: #00c030;
-  --cor-estrela: #00e054;
-  --cor-erro: #ff5a5f;
+  /* Acentos.
+   *
+   * O acento e o destrutivo são o mesmo vermelho, e isso é deliberado: eles se
+   * distinguem pela **forma**, não pelo tom. Ação primária é preenchida;
+   * destrutiva e erro são contorno ou texto sobre fundo tingido. Inventar um
+   * segundo vermelho para "perigo" só produziria dois vermelhos parecidos e
+   * ambíguos na mesma tela. */
+  --cor-destaque: #e11d2e;
+  --cor-destaque-forte: #f43f4f;
+  --cor-destaque-tenue: rgb(225 29 46 / 12%);
+  --cor-erro: #f43f4f;
+
+  /* A nota não é uma ação: âmbar a separa do vermelho de ação e segue a
+     convenção que todo catálogo de filme usa para avaliação. */
+  --cor-estrela: #f5b50a;
 
   /* Espaçamento (escala de 4px) */
   --esp-1: 0.25rem;
@@ -45,13 +64,18 @@
   --txt-xl: 1.5rem;
   --txt-2xl: 2rem;
 
-  /* Formas e profundidade */
+  /* Formas e profundidade.
+   *
+   * As sombras são bem mais densas que o usual porque o fundo é quase preto:
+   * uma sombra suave simplesmente desapareceria, e é ela que separa o cartão
+   * elevado da parede de pôsteres atrás dele. */
   --raio: 6px;
   --raio-lg: 10px;
-  --sombra: 0 2px 8px rgb(0 0 0 / 40%);
-  --sombra-alta: 0 8px 24px rgb(0 0 0 / 50%);
+  --sombra: 0 2px 8px rgb(0 0 0 / 50%);
+  --sombra-alta: 0 16px 40px rgb(0 0 0 / 70%);
   --transicao: 150ms ease;
+  --transicao-suave: 260ms cubic-bezier(0.2, 0.7, 0.3, 1);
 
   /* Layout */
-  --largura-max: 1200px;
+  --largura-max: 1400px;
 }

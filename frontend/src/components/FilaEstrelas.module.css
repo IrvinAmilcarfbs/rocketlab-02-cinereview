@@ -1,0 +1,45 @@
+/* Tamanho e vão vêm de quem usa a fila, por variável. A exibição usa estrelas
+   pequenas; o seletor, grandes. Como a geometria é resolvida por estrela, mudar
+   estes valores não desalinha nada. */
+.fila {
+  display: flex;
+  gap: var(--vao-estrela, 2px);
+  line-height: 0;
+}
+
+.estrela {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  width: var(--tam-estrela, 13px);
+  height: var(--tam-estrela, 13px);
+}
+
+/* A camada preenchida ocupa a caixa **inteira**; quem corta é o `clip-path`
+   aplicado no elemento. Um pai estreito com `overflow: hidden` não serviria: o
+   `max-width: 100%` global limitaria o ícone à largura do pai, e um SVG com
+   `viewBox` reage a isso encolhendo o desenho em vez de ser cortado. */
+.parte {
+  position: absolute;
+  inset: 0;
+}
+
+.vazia,
+.cheia {
+  display: block;
+  width: var(--tam-estrela, 13px);
+  height: var(--tam-estrela, 13px);
+  /* Neutraliza o `max-width: 100%` que a folha global aplica a todo `svg`. Hoje
+     o `clip-path` já torna isto desnecessário, porque a camada nunca é mais
+     estreita que o ícone — fica como salvaguarda, e como registro de que a
+     largura destes ícones não pode ser negociada pelo contexto. */
+  max-width: none;
+}
+
+.vazia {
+  fill: var(--cor-borda-forte);
+}
+
+.cheia {
+  fill: var(--cor-estrela);
+}

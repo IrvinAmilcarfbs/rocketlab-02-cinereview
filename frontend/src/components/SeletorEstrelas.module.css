@@ -8,41 +8,47 @@
   position: relative;
   display: inline-block;
   line-height: 0;
+  /* Estrelas grandes: o alvo de meia estrela precisa ser confortável de acertar
+     com o mouse. Com 32px, cada metade tem 16px.
+   *
+   * O vão é zero de propósito. A separação visual já vem de dentro do ícone — o
+   * traçado ocupa de x=2,5 a x=21,5 num `viewBox` de 24, deixando 2,5 unidades
+   * de folga em cada lado, ou seja 6,7px entre as tintas de estrelas vizinhas.
+   * Um `gap` de verdade criaria uma faixa morta entre as estrelas, onde o clique
+   * não escolheria nota nenhuma; com a folga por dentro, a fila é contínua e
+   * todo pixel pertence a alguma metade. */
+  --tam-estrela: 32px;
+  --vao-estrela: 0;
+  border-radius: var(--raio);
 }
 
-.trilha,
-.preenchida {
-  display: flex;
-  gap: 3px;
+/* O anel de foco pertence ao **grupo**, não a cada metade.
+ *
+ * Antes ele ficava em `.alvo:focus-within`, e clicar num rótulo move o foco para
+ * o rádio dentro dele — então todo clique de mouse desenhava uma moldura de
+ * ~19×34px em volta de uma fatia de estrela, que parecia um defeito de
+ * renderização. `:focus-visible` restringe o anel à navegação por teclado, que é
+ * quem precisa dele, e colocá-lo no grupo mostra onde o foco está sem recortar
+ * visualmente o desenho. */
+.estrelas:has(.radio:focus-visible) {
+  outline: 2px solid var(--cor-destaque);
+  outline-offset: 4px;
 }
 
-.preenchida {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
-
-.icone {
-  width: 28px;
-  height: 28px;
-  /* Sem isto os ícones encolheriam para caber na largura recortada,
-     em vez de serem cortados no meio. */
-  flex-shrink: 0;
-}
-
-.trilha .icone {
-  fill: var(--cor-borda-forte);
-}
-
-.preenchida .icone {
-  fill: var(--cor-estrela);
-}
-
-/* As dez áreas clicáveis cobrem o desenho: duas por estrela, meia largura cada. */
+/* Os alvos espelham a estrutura da fila: um par por estrela, cada par com a
+   largura de uma estrela, e os mesmos vãos entre eles. Assim cada metade
+   clicável cobre exatamente a metade desenhada. */
 .alvos {
   position: absolute;
   inset: 0;
   display: flex;
+  gap: var(--vao-estrela);
+}
+
+.par {
+  display: flex;
+  flex-shrink: 0;
+  width: var(--tam-estrela);
 }
 
 .alvo {
@@ -50,18 +56,12 @@
   cursor: pointer;
 }
 
-/* O rádio é invisível mas continua focável, e o foco aparece na área inteira. */
+/* O rádio é invisível mas continua focável. */
 .radio {
   position: absolute;
   width: 1px;
   height: 1px;
   opacity: 0;
-}
-
-.alvo:focus-within {
-  outline: 2px solid var(--cor-destaque);
-  outline-offset: 2px;
-  border-radius: 2px;
 }
 
 .leitura {
